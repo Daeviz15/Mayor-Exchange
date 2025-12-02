@@ -42,8 +42,8 @@ class AppUser {
     return AppUser(
       id: id ?? this.id,
       email: email ?? this.email,
-      firstName: fullName ?? this.firstName,
-      lastName: lastName ?? this.lastName,
+      firstName: fullName ?? firstName,
+      lastName: lastName ?? lastName,
       createdAt: createdAt ?? this.createdAt,
     );
   }
