@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/coingecko_models.dart';
 import '../models/crypto_details.dart';
@@ -29,7 +30,9 @@ class CoinGeckoService {
         '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinIds&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h',
       );
 
+      debugPrint('🌐 CoinGecko API: Requesting market data from: $url');
       final response = await http.get(url);
+      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -76,11 +79,19 @@ class CoinGeckoService {
           return aIndex.compareTo(bIndex);
         });
 
+        debugPrint(
+          '✅ CoinGecko API: Successfully parsed ${marketData.length} coins',
+        );
         return marketData;
       } else {
+        debugPrint(
+          '❌ CoinGecko API: Failed with status ${response.statusCode}',
+        );
+        debugPrint('📄 Response body: ${response.body}');
         throw Exception('Failed to load market data: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('❌ CoinGecko API: Exception in getMarketData: $e');
       throw Exception('Error fetching market data: $e');
     }
   }
@@ -108,7 +119,11 @@ class CoinGeckoService {
         '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinId&order=market_cap_desc&per_page=1&page=1&sparkline=false&price_change_percentage=24h',
       );
 
+      debugPrint(
+        '🌐 CoinGecko API: Requesting coin details for $symbol from: $url',
+      );
       final response = await http.get(url);
+      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -184,7 +199,11 @@ class CoinGeckoService {
         '$_baseUrl/coins/$coinId/market_chart?vs_currency=usd&days=$days&interval=$interval',
       );
 
+      debugPrint(
+        '🌐 CoinGecko API: Requesting historical data for $symbol from: $url',
+      );
       final response = await http.get(url);
+      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
