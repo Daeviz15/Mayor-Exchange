@@ -19,7 +19,7 @@ TO authenticated
 WITH CHECK (
   bucket_id = 'profile-images' 
   AND (
-    -- Check if path starts with user ID followed by /
+    -- Check if path starts with user ID followed 
     name LIKE auth.uid()::text || '/%'
     OR
     -- Alternative: extract first folder from path
