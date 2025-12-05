@@ -9,6 +9,7 @@ class CryptoData {
   final double changePercent;
   final Color iconColor;
   final String iconLetter;
+  final String? iconUrl; // CoinGecko icon URL
   final List<double> chartData; // Simple price history for chart
 
   CryptoData({
@@ -18,6 +19,7 @@ class CryptoData {
     required this.changePercent,
     required this.iconColor,
     required this.iconLetter,
+    this.iconUrl,
     required this.chartData,
   });
 }

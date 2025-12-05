@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
-class FormWidget extends StatelessWidget {
+class FormWidget extends StatefulWidget {
   final String hintText;
   final String labelText;
   final Icon icon;
   final bool obscureText;
   final TextInputType keyboardType;
   final Icon? hidePasswordIcon;
+  final TextEditingController? controller;
 
   const FormWidget({
     super.key,
@@ -16,7 +17,27 @@ class FormWidget extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
     this.hidePasswordIcon,
+    this.controller,
   });
+
+  @override
+  State<FormWidget> createState() => _FormWidgetState();
+}
+
+class _FormWidgetState extends State<FormWidget> {
+  late bool _obscureText;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscureText = widget.obscureText;
+  }
+
+  void _togglePasswordVisibility() {
+    setState(() {
+      _obscureText = !_obscureText;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +47,7 @@ class FormWidget extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 22.0, bottom: 8.0),
           child: Text(
-            labelText,
+            widget.labelText,
             style: const TextStyle(
               color: Color.fromARGB(187, 255, 255, 255),
               fontSize: 16,
@@ -42,13 +63,22 @@ class FormWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextFormField(
-            obscureText: obscureText,
-            keyboardType: keyboardType,
+            controller: widget.controller,
+            obscureText: _obscureText,
+            keyboardType: widget.keyboardType,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              prefixIcon: icon,
-              suffixIcon: hidePasswordIcon,
-              hintText: hintText,
+              prefixIcon: widget.icon,
+              suffixIcon: widget.hidePasswordIcon != null
+                  ? IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: _togglePasswordVisibility,
+                    )
+                  : null,
+              hintText: widget.hintText,
               hintStyle: const TextStyle(
                 color: Color.fromARGB(104, 255, 255, 255),
               ),

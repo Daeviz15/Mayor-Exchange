@@ -6,6 +6,7 @@ import '../providers/crypto_providers.dart';
 import '../widgets/price_chart_widget.dart';
 import '../widgets/crypto_data_card.dart';
 import '../widgets/order_form_widget.dart';
+import '../widgets/crypto_details_skeleton.dart';
 import '../../dasboard/widgets/bottom_nav_bar.dart';
 import '../../dasboard/screens/home_screen.dart';
 import '../../dasboard/screens/settings_screen.dart';
@@ -291,14 +292,7 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
       ),
     );
       },
-      loading: () => Scaffold(
-        backgroundColor: AppColors.backgroundDark,
-        body: const Center(
-          child: CircularProgressIndicator(
-            color: AppColors.primaryOrange,
-          ),
-        ),
-      ),
+      loading: () => const CryptoDetailsSkeleton(),
       error: (error, stack) => Scaffold(
         backgroundColor: AppColors.backgroundDark,
         body: Center(

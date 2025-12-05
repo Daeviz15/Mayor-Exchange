@@ -43,6 +43,7 @@ final cryptoListProvider = FutureProvider<List<CryptoData>>((ref) async {
           changePercent: data.priceChangePercent24h,
           iconColor: _getIconColor(data.symbol),
           iconLetter: _getIconLetter(data.symbol),
+          iconUrl: data.imageUrl.isNotEmpty ? data.imageUrl : null,
           chartData: chartPoints,
         ),
       );

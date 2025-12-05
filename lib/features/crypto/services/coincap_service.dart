@@ -80,8 +80,7 @@ class CoinCapService {
             // Parse CoinCap response to fit existing model
             final currentPrice =
                 double.tryParse(coinData['priceUsd']?.toString() ?? '0') ?? 0.0;
-            final priceChangePercent24h =
-                double.tryParse(
+            final priceChangePercent24h = double.tryParse(
                   coinData['changePercent24Hr']?.toString() ?? '0',
                 ) ??
                 0.0;
@@ -95,20 +94,18 @@ class CoinCapService {
                 currentPrice: currentPrice,
                 priceChange24h: priceChange24h,
                 priceChangePercent24h: priceChangePercent24h,
-                high24h:
-                    currentPrice *
+                high24h: currentPrice *
                     1.02, // CoinCap doesn't provide high/low, approximate
                 low24h: currentPrice * 0.98,
-                volume24h:
-                    double.tryParse(
+                volume24h: double.tryParse(
                       coinData['volumeUsd24Hr']?.toString() ?? '0',
                     ) ??
                     0.0,
-                marketCap:
-                    double.tryParse(
+                marketCap: double.tryParse(
                       coinData['marketCapUsd']?.toString() ?? '0',
                     ) ??
                     0.0,
+                imageUrl: _getCoinImageUrl(coinId),
                 lastUpdated: DateTime.now(),
               ),
             );
@@ -164,7 +161,7 @@ class CoinCapService {
             double.tryParse(coinData['priceUsd']?.toString() ?? '0') ?? 0.0;
         final priceChangePercent24h =
             double.tryParse(coinData['changePercent24Hr']?.toString() ?? '0') ??
-            0.0;
+                0.0;
         final priceChange24h = currentPrice * (priceChangePercent24h / 100);
 
         return CoinGeckoCoinDetails(
@@ -178,10 +175,10 @@ class CoinCapService {
           low24h: currentPrice * 0.98,
           volume24h:
               double.tryParse(coinData['volumeUsd24Hr']?.toString() ?? '0') ??
-              0.0,
+                  0.0,
           marketCap:
               double.tryParse(coinData['marketCapUsd']?.toString() ?? '0') ??
-              0.0,
+                  0.0,
           lastUpdated: DateTime.now(),
         );
       } else {
@@ -278,5 +275,17 @@ class CoinCapService {
       default:
         return symbol;
     }
+  }
+
+  /// Get CoinGecko image URL for a coin ID
+  /// CoinCap doesn't provide images, so we use CoinGecko's CDN
+  static String _getCoinImageUrl(String coinId) {
+    // Map CoinCap IDs to CoinGecko image URLs
+    final imageMap = {
+      'bitcoin': 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
+      'ethereum': 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
+      'solana': 'https://assets.coingecko.com/coins/images/4128/large/solana.png',
+    };
+    return imageMap[coinId.toLowerCase()] ?? '';
   }
 }

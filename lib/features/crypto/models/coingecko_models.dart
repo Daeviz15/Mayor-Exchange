@@ -12,6 +12,7 @@ class CoinGeckoMarketData {
   final double low24h;
   final double volume24h;
   final double marketCap;
+  final String imageUrl;
   final DateTime lastUpdated;
 
   CoinGeckoMarketData({
@@ -25,6 +26,7 @@ class CoinGeckoMarketData {
     required this.low24h,
     required this.volume24h,
     required this.marketCap,
+    required this.imageUrl,
     required this.lastUpdated,
   });
 }

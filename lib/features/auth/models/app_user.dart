@@ -1,15 +1,15 @@
 class AppUser {
   final String id;
   final String email;
-  final String? firstName;
-  final String? lastName;
+  final String? fullName;
+  final String? avatarUrl;
   final DateTime createdAt;
 
   AppUser({
     required this.id,
     required this.email,
-    this.firstName,
-    this.lastName,
+    this.fullName,
+    this.avatarUrl,
     required this.createdAt,
   });
 
@@ -17,8 +17,8 @@ class AppUser {
     return AppUser(
       id: json['id'] as String,
       email: json['email'] as String,
-      firstName: json['full_name'] as String?,
-      lastName: json['last_name'] as String?,
+      fullName: json['full_name'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -27,8 +27,8 @@ class AppUser {
     return {
       'id': id,
       'email': email,
-      'firstName': firstName,
-      'lastName': lastName,
+      'full_name': fullName,
+      'avatar_url': avatarUrl,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -37,13 +37,14 @@ class AppUser {
     String? id,
     String? email,
     String? fullName,
+    String? avatarUrl,
     DateTime? createdAt,
   }) {
     return AppUser(
       id: id ?? this.id,
       email: email ?? this.email,
-      firstName: fullName ?? firstName,
-      lastName: lastName ?? lastName,
+      fullName: fullName ?? this.fullName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       createdAt: createdAt ?? this.createdAt,
     );
   }

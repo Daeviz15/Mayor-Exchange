@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../models/crypto_data.dart';
@@ -46,18 +47,61 @@ class CryptoCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: crypto.iconColor,
+                  color: crypto.iconColor.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: Text(
-                    crypto.iconLetter,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                child: ClipOval(
+                  child: crypto.iconUrl != null && crypto.iconUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: crypto.iconUrl!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 96, // Reduce memory usage
+                          memCacheHeight: 96,
+                          maxWidthDiskCache: 200,
+                          maxHeightDiskCache: 200,
+                          cacheKey: 'crypto_icon_${crypto.symbol}',
+                          placeholder: (context, url) => Container(
+                            color: crypto.iconColor,
+                            child: Center(
+                              child: Text(
+                                crypto.iconLetter,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: crypto.iconColor,
+                            child: Center(
+                              child: Text(
+                                crypto.iconLetter,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: crypto.iconColor,
+                          child: Center(
+                            child: Text(
+                              crypto.iconLetter,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),

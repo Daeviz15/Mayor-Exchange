@@ -15,12 +15,10 @@ class AppTheme {
         primary: AppColors.primaryOrange,
         secondary: AppColors.primaryOrangeLight,
         surface: AppColors.backgroundCard,
-        background: AppColors.backgroundDark,
         error: AppColors.error,
         onPrimary: AppColors.textPrimary,
         onSecondary: AppColors.textPrimary,
         onSurface: AppColors.textPrimary,
-        onBackground: AppColors.textPrimary,
         onError: AppColors.textPrimary,
       ),
 

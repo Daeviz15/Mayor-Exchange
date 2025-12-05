@@ -16,15 +16,16 @@ final authStateProvider = StreamProvider<User?>((ref) {
 
 final currentUserProvider = Provider<AppUser?>((ref) {
   final authState = ref.watch(authStateProvider);
-  
+
   return authState.when(
     data: (user) {
       if (user == null) return null;
       return AppUser(
         id: user.id,
         email: user.email!,
-        firstName: user.userMetadata?['firstName'] as String?,
-        lastName: user.userMetadata?['lastName'] as String?,
+        fullName: user.userMetadata?['full_name'] as String? ??
+            user.userMetadata?['name'] as String?,
+        avatarUrl: user.userMetadata?['avatar_url'] as String?,
         createdAt: DateTime.parse(user.createdAt),
       );
     },

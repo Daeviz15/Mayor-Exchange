@@ -6,6 +6,7 @@ import '../widgets/dashboard_header.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/quick_action_button.dart';
 import '../widgets/crypto_card.dart';
+import '../widgets/crypto_card_skeleton.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../providers/balance_provider.dart';
 import '../../crypto/providers/crypto_providers.dart';
@@ -13,6 +14,8 @@ import '../../giftcards/screens/gift_cards_screen.dart';
 import '../../crypto/screens/crypto_details_screen.dart';
 import 'settings_screen.dart';
 import '../../../core/providers/navigation_provider.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../auth/providers/profile_avatar_provider.dart';
 
 /// Home Screen (Dashboard)
 /// Main dashboard screen for Mayor Exchange
@@ -29,6 +32,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final balanceState = ref.watch(balanceProvider);
     final cryptoListAsync = ref.watch(cryptoListProvider);
     final currentNavIndex = ref.watch(navigationProvider);
+    final authState = ref.watch(authControllerProvider);
+    final avatarState = ref.watch(profileAvatarProvider);
+    final user = authState.asData?.value;
+    final displayName = (user?.fullName?.trim().isNotEmpty == true)
+        ? user!.fullName!
+        : (user?.email.split('@').first ?? 'User');
+    final email = user?.email ?? '';
+    // Priority: Storage URL from provider > User metadata URL
+    final localAvatarPath = avatarState.localPath;
+    final networkAvatarUrl = avatarState.storageUrl ?? user?.avatarUrl;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -37,6 +50,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             // Header
             DashboardHeader(
+              displayName: displayName,
+              email: email,
+              localAvatarPath: localAvatarPath,
+              networkAvatarUrl: networkAvatarUrl,
               onAvatarTap: () {
                 Navigator.push(
                   context,
@@ -151,14 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         );
                       },
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primaryOrange,
-                          ),
-                        ),
-                      ),
+                      loading: () => const CryptoCardSkeletonList(count: 3),
                       error: (error, stack) => Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: Center(

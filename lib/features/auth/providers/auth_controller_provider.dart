@@ -14,8 +14,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     required String email,
     required String password,
     required String confirmPassword,
-    String? firstName,
-    String? lastName,
+    required String fullName,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
@@ -23,7 +22,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
         email: email,
         password: password,
         confirmPassword: confirmPassword,
-        firstname: firstName,
+        fullName: fullName,
       );
     });
   }

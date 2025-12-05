@@ -1,14 +1,90 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Dashboard Header Widget
-/// Header with avatar and notification icon
 class DashboardHeader extends StatelessWidget {
   final VoidCallback? onNotificationTap;
   final VoidCallback? onAvatarTap;
+  final String? displayName;
+  final String? email;
+  final String? localAvatarPath;
+  final String? networkAvatarUrl;
 
-  const DashboardHeader({super.key, this.onNotificationTap, this.onAvatarTap});
+  const DashboardHeader({
+    super.key,
+    this.onNotificationTap,
+    this.onAvatarTap,
+    this.displayName,
+    this.email,
+    this.localAvatarPath,
+    this.networkAvatarUrl,
+  });
+
+  Widget _buildAvatarContent({
+    String? localAvatarPath,
+    String? networkAvatarUrl,
+  }) {
+    // Priority: Storage URL > Local Path
+    final imageUrl = networkAvatarUrl ?? 
+                     (localAvatarPath != null ? 'file://$localAvatarPath' : null);
+
+    if (imageUrl == null) {
+      return const Icon(
+        Icons.person,
+        color: Colors.white,
+        size: 24,
+      );
+    }
+
+    if (imageUrl.startsWith('file://')) {
+      // Local file
+      final filePath = imageUrl.replaceFirst('file://', '');
+      return Image.file(
+        File(filePath),
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(
+          Icons.person,
+          color: Colors.white,
+          size: 24,
+        ),
+      );
+    } else {
+      // Network URL (Supabase Storage)
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          memCacheWidth: 80,
+          memCacheHeight: 80,
+          maxWidthDiskCache: 200,
+          maxHeightDiskCache: 200,
+          placeholder: (context, url) => Container(
+            color: AppColors.avatarBackground,
+            child: const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: AppColors.avatarBackground,
+            child: const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,18 +116,38 @@ class DashboardHeader extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.avatarBackground,
                       shape: BoxShape.circle,
+                      image: localAvatarPath != null
+                          ? DecorationImage(
+                              image: FileImage(
+                                File(localAvatarPath!),
+                              ),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 24,
+                    child: _buildAvatarContent(
+                      localAvatarPath: localAvatarPath,
+                      networkAvatarUrl: networkAvatarUrl,
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Mayor Exchange',
-                  style: AppTextStyles.titleLarge(context),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName?.isNotEmpty == true
+                          ? displayName!
+                          : 'User',
+                      style: AppTextStyles.titleLarge(context),
+                    ),
+                    if (email != null && email!.isNotEmpty)
+                      Text(
+                        email!,
+                        style: AppTextStyles.bodySmall(context)
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                  ],
                 ),
               ],
             ),

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/services/cache_service.dart';
 import '../models/coingecko_models.dart';
 import '../models/crypto_details.dart';
 
@@ -14,6 +16,11 @@ class CoinGeckoService {
     'BTC': 'bitcoin',
     'ETH': 'ethereum',
     'SOL': 'solana',
+    'USDT': 'tether',
+    'BNB': 'binancecoin',
+    'XRP': 'ripple',
+    'ADA': 'cardano',
+    'DOGE': 'dogecoin',
   };
 
   /// Get CoinGecko ID from symbol
@@ -21,17 +28,55 @@ class CoinGeckoService {
     return _coinIds[symbol.toUpperCase()];
   }
 
+  /// Get headers for API requests
+  static Map<String, String> _getHeaders() {
+    final apiKey = dotenv.env['COINGECKO_API_KEY'];
+    if (apiKey != null && apiKey.isNotEmpty) {
+      return {'x-cg-demo-api-key': apiKey, 'Content-Type': 'application/json'};
+    }
+    return {'Content-Type': 'application/json'};
+  }
+
   /// Fetch market data for multiple cryptocurrencies
   /// Returns list of market data for BTC, ETH, and SOL
-  static Future<List<CoinGeckoMarketData>> getMarketData() async {
+  /// Uses cache to reduce API calls (5 minute cache duration)
+  static Future<List<CoinGeckoMarketData>> getMarketData({bool forceRefresh = false}) async {
+    const cacheKey = 'coingecko_market_data';
+    
+    // Try to get from cache first (unless force refresh)
+    if (!forceRefresh) {
+      final cached = await CacheService.getList<CoinGeckoMarketData>(
+        cacheKey,
+        (json) => CoinGeckoMarketData(
+          id: json['id'] as String,
+          symbol: json['symbol'] as String,
+          name: json['name'] as String,
+          currentPrice: (json['currentPrice'] as num).toDouble(),
+          priceChange24h: (json['priceChange24h'] as num).toDouble(),
+          priceChangePercent24h: (json['priceChangePercent24h'] as num).toDouble(),
+          high24h: (json['high24h'] as num).toDouble(),
+          low24h: (json['low24h'] as num).toDouble(),
+          volume24h: (json['volume24h'] as num).toDouble(),
+          marketCap: (json['marketCap'] as num).toDouble(),
+          imageUrl: json['imageUrl'] as String,
+          lastUpdated: DateTime.parse(json['lastUpdated'] as String),
+        ),
+      );
+      
+      if (cached != null && cached.isNotEmpty) {
+        debugPrint('✅ CoinGecko API: Using cached market data');
+        return cached;
+      }
+    }
+
     try {
       final coinIds = _coinIds.values.join(',');
       final url = Uri.parse(
-        '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinIds&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h',
+        '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinIds&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h',
       );
 
       debugPrint('🌐 CoinGecko API: Requesting market data from: $url');
-      final response = await http.get(url);
+      final response = await http.get(url, headers: _getHeaders());
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -61,6 +106,7 @@ class CoinGeckoService {
                 volume24h:
                     (coinData['total_volume'] as num?)?.toDouble() ?? 0.0,
                 marketCap: (coinData['market_cap'] as num?)?.toDouble() ?? 0.0,
+                imageUrl: coinData['image'] as String? ?? '',
                 lastUpdated: coinData['last_updated'] != null
                     ? DateTime.parse(coinData['last_updated'] as String)
                     : DateTime.now(),
@@ -69,9 +115,18 @@ class CoinGeckoService {
           }
         }
 
-        // Sort to maintain BTC, ETH, SOL order
+        // Sort to maintain specific order if needed, or just return as is
         marketData.sort((a, b) {
-          final order = ['BTC', 'ETH', 'SOL'];
+          final order = [
+            'BTC',
+            'ETH',
+            'SOL',
+            'BNB',
+            'XRP',
+            'ADA',
+            'DOGE',
+            'USDT',
+          ];
           final aIndex = order.indexOf(a.symbol);
           final bIndex = order.indexOf(b.symbol);
           if (aIndex == -1) return 1;
@@ -82,6 +137,28 @@ class CoinGeckoService {
         debugPrint(
           '✅ CoinGecko API: Successfully parsed ${marketData.length} coins',
         );
+        
+        // Cache the data for 5 minutes
+        await CacheService.setList<CoinGeckoMarketData>(
+          cacheKey,
+          marketData,
+          (data) => {
+            'id': data.id,
+            'symbol': data.symbol,
+            'name': data.name,
+            'currentPrice': data.currentPrice,
+            'priceChange24h': data.priceChange24h,
+            'priceChangePercent24h': data.priceChangePercent24h,
+            'high24h': data.high24h,
+            'low24h': data.low24h,
+            'volume24h': data.volume24h,
+            'marketCap': data.marketCap,
+            'imageUrl': data.imageUrl,
+            'lastUpdated': data.lastUpdated.toIso8601String(),
+          },
+          duration: const Duration(minutes: 5),
+        );
+        
         return marketData;
       } else {
         debugPrint(
@@ -122,7 +199,7 @@ class CoinGeckoService {
       debugPrint(
         '🌐 CoinGecko API: Requesting coin details for $symbol from: $url',
       );
-      final response = await http.get(url);
+      final response = await http.get(url, headers: _getHeaders());
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -184,25 +261,17 @@ class CoinGeckoService {
         TimeRange.oneYear => 365,
       };
 
-      // CoinGecko API doesn't support hourly interval for all ranges
-      // Use appropriate interval based on days
-      String interval = 'daily';
-      if (days <= 1) {
-        interval = 'hourly';
-      } else if (days <= 90) {
-        interval = 'daily';
-      } else {
-        interval = 'daily'; // For longer ranges, use daily
-      }
+      // For 1 hour, we need to be careful. '1' day gives 5-min intervals.
+      // We can filter later.
 
       final url = Uri.parse(
-        '$_baseUrl/coins/$coinId/market_chart?vs_currency=usd&days=$days&interval=$interval',
+        '$_baseUrl/coins/$coinId/market_chart?vs_currency=usd&days=$days${days > 90 ? "&interval=daily" : ""}',
       );
 
       debugPrint(
         '🌐 CoinGecko API: Requesting historical data for $symbol from: $url',
       );
-      final response = await http.get(url);
+      final response = await http.get(url, headers: _getHeaders());
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -253,6 +322,16 @@ class CoinGeckoService {
         return 'Ethereum';
       case 'SOL':
         return 'Solana';
+      case 'USDT':
+        return 'Tether';
+      case 'BNB':
+        return 'Binance Coin';
+      case 'XRP':
+        return 'XRP';
+      case 'ADA':
+        return 'Cardano';
+      case 'DOGE':
+        return 'Dogecoin';
       default:
         return symbol;
     }
