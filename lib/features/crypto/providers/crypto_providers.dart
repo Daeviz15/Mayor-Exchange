@@ -37,6 +37,7 @@ final cryptoListProvider = FutureProvider<List<CryptoData>>((ref) async {
 
       cryptoList.add(
         CryptoData(
+          id: data.id,
           symbol: data.symbol,
           name: data.name,
           price: data.currentPrice,
@@ -142,40 +143,40 @@ final cryptoDetailsProvider = FutureProvider.family<CryptoDetails, String>((
 /// Provides chart data for a specific symbol and time range
 final chartDataProvider =
     FutureProvider.family<List<PricePoint>, ChartDataParams>((
-      ref,
-      params,
-    ) async {
-      try {
-        // Generate chart data instead of fetching
-        final chartPrices = _generateChartData(
-          params.symbol == 'BTC'
-              ? 90000.0
-              : params.symbol == 'ETH'
+  ref,
+  params,
+) async {
+  try {
+    // Generate chart data instead of fetching
+    final chartPrices = _generateChartData(
+      params.symbol == 'BTC'
+          ? 90000.0
+          : params.symbol == 'ETH'
               ? 3000.0
               : 140.0, // Approximate current price
-          params.symbol == 'BTC'
-              ? 5.0
-              : params.symbol == 'ETH'
+      params.symbol == 'BTC'
+          ? 5.0
+          : params.symbol == 'ETH'
               ? 7.0
               : 10.0, // Approximate 24h change
-        );
+    );
 
-        return chartPrices
-            .map(
-              (price) => PricePoint(
-                time: DateTime.now().subtract(
-                  Duration(
-                    hours: chartPrices.length - chartPrices.indexOf(price),
-                  ),
-                ),
-                price: price,
+    return chartPrices
+        .map(
+          (price) => PricePoint(
+            time: DateTime.now().subtract(
+              Duration(
+                hours: chartPrices.length - chartPrices.indexOf(price),
               ),
-            )
-            .toList();
-      } catch (e) {
-        return [];
-      }
-    });
+            ),
+            price: price,
+          ),
+        )
+        .toList();
+  } catch (e) {
+    return [];
+  }
+});
 
 /// Chart Data Parameters
 class ChartDataParams {
@@ -218,8 +219,8 @@ String _getIconLetter(String symbol) {
 /// Selected Time Range Provider
 final selectedTimeRangeProvider =
     StateNotifierProvider<TimeRangeNotifier, TimeRange>((ref) {
-      return TimeRangeNotifier();
-    });
+  return TimeRangeNotifier();
+});
 
 class TimeRangeNotifier extends StateNotifier<TimeRange> {
   TimeRangeNotifier() : super(TimeRange.twentyFourHours);

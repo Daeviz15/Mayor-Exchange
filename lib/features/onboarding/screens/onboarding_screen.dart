@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mayor_exchange/core/theme/app_colors.dart';
 import 'package:mayor_exchange/features/auth/screens/signup_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -157,7 +159,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _navigateToRegistration() {
+  Future<void> _navigateToRegistration() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seenOnboarding', true);
+
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(

@@ -21,6 +21,8 @@ class CoinGeckoService {
     'XRP': 'ripple',
     'ADA': 'cardano',
     'DOGE': 'dogecoin',
+    'TRX': 'tron',
+    'DOT': 'polkadot',
   };
 
   /// Get CoinGecko ID from symbol
@@ -40,9 +42,10 @@ class CoinGeckoService {
   /// Fetch market data for multiple cryptocurrencies
   /// Returns list of market data for BTC, ETH, and SOL
   /// Uses cache to reduce API calls (5 minute cache duration)
-  static Future<List<CoinGeckoMarketData>> getMarketData({bool forceRefresh = false}) async {
+  static Future<List<CoinGeckoMarketData>> getMarketData(
+      {bool forceRefresh = false}) async {
     const cacheKey = 'coingecko_market_data';
-    
+
     // Try to get from cache first (unless force refresh)
     if (!forceRefresh) {
       final cached = await CacheService.getList<CoinGeckoMarketData>(
@@ -53,7 +56,8 @@ class CoinGeckoService {
           name: json['name'] as String,
           currentPrice: (json['currentPrice'] as num).toDouble(),
           priceChange24h: (json['priceChange24h'] as num).toDouble(),
-          priceChangePercent24h: (json['priceChangePercent24h'] as num).toDouble(),
+          priceChangePercent24h:
+              (json['priceChangePercent24h'] as num).toDouble(),
           high24h: (json['high24h'] as num).toDouble(),
           low24h: (json['low24h'] as num).toDouble(),
           volume24h: (json['volume24h'] as num).toDouble(),
@@ -62,7 +66,7 @@ class CoinGeckoService {
           lastUpdated: DateTime.parse(json['lastUpdated'] as String),
         ),
       );
-      
+
       if (cached != null && cached.isNotEmpty) {
         debugPrint('✅ CoinGecko API: Using cached market data');
         return cached;
@@ -99,8 +103,8 @@ class CoinGeckoService {
                     (coinData['price_change_24h'] as num?)?.toDouble() ?? 0.0,
                 priceChangePercent24h:
                     (coinData['price_change_percentage_24h'] as num?)
-                        ?.toDouble() ??
-                    0.0,
+                            ?.toDouble() ??
+                        0.0,
                 high24h: (coinData['high_24h'] as num?)?.toDouble() ?? 0.0,
                 low24h: (coinData['low_24h'] as num?)?.toDouble() ?? 0.0,
                 volume24h:
@@ -125,6 +129,8 @@ class CoinGeckoService {
             'XRP',
             'ADA',
             'DOGE',
+            'TRX',
+            'DOT',
             'USDT',
           ];
           final aIndex = order.indexOf(a.symbol);
@@ -137,7 +143,7 @@ class CoinGeckoService {
         debugPrint(
           '✅ CoinGecko API: Successfully parsed ${marketData.length} coins',
         );
-        
+
         // Cache the data for 5 minutes
         await CacheService.setList<CoinGeckoMarketData>(
           cacheKey,
@@ -158,7 +164,7 @@ class CoinGeckoService {
           },
           duration: const Duration(minutes: 5),
         );
-        
+
         return marketData;
       } else {
         debugPrint(
@@ -214,7 +220,7 @@ class CoinGeckoService {
             (coinData['current_price'] as num?)?.toDouble() ?? 0.0;
         final priceChangePercent24h =
             (coinData['price_change_percentage_24h'] as num?)?.toDouble() ??
-            0.0;
+                0.0;
         final priceChange24h = currentPrice * (priceChangePercent24h / 100);
 
         return CoinGeckoCoinDetails(
@@ -332,6 +338,10 @@ class CoinGeckoService {
         return 'Cardano';
       case 'DOGE':
         return 'Dogecoin';
+      case 'TRX':
+        return 'TRON';
+      case 'DOT':
+        return 'Polkadot';
       default:
         return symbol;
     }

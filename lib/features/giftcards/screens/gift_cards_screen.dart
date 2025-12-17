@@ -4,12 +4,17 @@ import '../../../core/theme/app_text_styles.dart';
 import '../models/gift_card.dart';
 import '../data/gift_cards_data.dart';
 import '../widgets/gift_card_item.dart';
+import '../../transactions/screens/buy_sell_giftcard_screen.dart';
+import '../../transactions/models/transaction.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/currency_selector.dart';
 import '../../dasboard/widgets/bottom_nav_bar.dart';
-import '../../dasboard/screens/home_screen.dart';
+
 import '../../dasboard/screens/settings_screen.dart';
+import '../../portfolio/screens/portfolio_screen.dart';
+import '../../transactions/screens/buy_sell_crypto_screen.dart';
+import '../../../core/widgets/animations/page_transitions.dart';
 
 /// Gift Cards Screen
 /// Main screen for browsing and searching gift cards
@@ -50,17 +55,17 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
   void _filterGiftCards() {
     setState(() {
       final query = _searchController.text.toLowerCase();
-      
+
       _filteredGiftCards = _allGiftCards.where((card) {
         // Category filter
         final categoryMatch = _selectedCategory == GiftCardCategory.all ||
             card.category == _selectedCategory;
-        
+
         // Search filter
         final searchMatch = query.isEmpty ||
             card.name.toLowerCase().contains(query) ||
             card.category.toLowerCase().contains(query);
-        
+
         return categoryMatch && searchMatch;
       }).toList();
     });
@@ -164,7 +169,8 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         childAspectRatio: 0.75,
                         crossAxisSpacing: 16,
@@ -193,27 +199,31 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
           setState(() {
             _currentNavIndex = index;
           });
-          
+
           // Handle navigation
           if (index == 0) {
-            // Home tab
+            // Home tab - pop back to home (root)
+            Navigator.pop(context);
+          } else if (index == 1) {
+            // Portfolio Tab
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              SlidePageRoute(page: const PortfolioScreen()),
+            );
+          } else if (index == 2) {
+            // Trade Tab
+            Navigator.pushReplacement(
+              context,
+              SlidePageRoute(page: const BuySellCryptoScreen()),
             );
           } else if (index == 3) {
-            // Gift Cards tab - already here, do nothing
+            // Gift Cards tab - already here
           } else if (index == 4) {
             // Settings tab
-            Navigator.push(
+            Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            ).then((_) {
-              // Return to gift cards screen
-              setState(() {
-                _currentNavIndex = 3;
-              });
-            });
+              SlidePageRoute(page: const SettingsScreen()),
+            );
           }
         },
       ),
@@ -286,7 +296,16 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // Navigate to trade screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BuySellGiftCardScreen(
+                        initialType: TransactionType
+                            .sellGiftCard, // Default to Sell as per typical flow, or let them choose tab
+                        initialCard: giftCard.name,
+                      ),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
@@ -310,4 +329,3 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
     );
   }
 }
-

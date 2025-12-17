@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'auth_providers.dart';
 
@@ -88,6 +89,108 @@ final biometricAuthProvider = Provider<LocalAuthentication>((ref) {
   return LocalAuthentication();
 });
 
+/// Last Logged In User State
+/// Stores the last logged-in user's credentials for biometric login
+class LastLoggedInUser {
+  final String email;
+  final String? avatarUrl;
+  final String? displayName;
+
+  const LastLoggedInUser({
+    required this.email,
+    this.avatarUrl,
+    this.displayName,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'email': email,
+        'avatar_url': avatarUrl,
+        'display_name': displayName,
+      };
+
+  factory LastLoggedInUser.fromJson(Map<String, dynamic> json) {
+    return LastLoggedInUser(
+      email: json['email'] as String,
+      avatarUrl: json['avatar_url'] as String?,
+      displayName: json['display_name'] as String?,
+    );
+  }
+}
+
+/// Last Logged In User Provider
+final lastLoggedInUserProvider =
+    NotifierProvider<LastLoggedInUserNotifier, LastLoggedInUser?>(
+  LastLoggedInUserNotifier.new,
+);
+
+class LastLoggedInUserNotifier extends Notifier<LastLoggedInUser?> {
+  static const String _emailKey = 'last_logged_in_email';
+  static const String _avatarKey = 'last_logged_in_avatar';
+  static const String _displayNameKey = 'last_logged_in_display_name';
+  static const String _passwordKey = 'last_logged_in_password';
+
+  // Create secure storage instance
+  final _secureStorage = const FlutterSecureStorage();
+
+  @override
+  LastLoggedInUser? build() {
+    _loadUser();
+    return null;
+  }
+
+  Future<void> _loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_emailKey);
+    if (email != null) {
+      state = LastLoggedInUser(
+        email: email,
+        avatarUrl: prefs.getString(_avatarKey),
+        displayName: prefs.getString(_displayNameKey),
+      );
+    }
+  }
+
+  Future<void> setUser({
+    required String email,
+    String? avatarUrl,
+    String? displayName,
+    String? password,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_emailKey, email);
+    if (avatarUrl != null) {
+      await prefs.setString(_avatarKey, avatarUrl);
+    }
+    if (displayName != null) {
+      await prefs.setString(_displayNameKey, displayName);
+    }
+
+    // Store password securely if provided
+    if (password != null) {
+      await _secureStorage.write(key: _passwordKey, value: password);
+    }
+
+    state = LastLoggedInUser(
+      email: email,
+      avatarUrl: avatarUrl,
+      displayName: displayName,
+    );
+  }
+
+  Future<String?> getPassword() async {
+    return await _secureStorage.read(key: _passwordKey);
+  }
+
+  Future<void> clearUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_emailKey);
+    await prefs.remove(_avatarKey);
+    await prefs.remove(_displayNameKey);
+    await _secureStorage.delete(key: _passwordKey);
+    state = null;
+  }
+}
+
 /// Change Password Provider
 final changePasswordProvider =
     NotifierProvider<ChangePasswordNotifier, AsyncValue<void>>(
@@ -116,7 +219,7 @@ class ChangePasswordNotifier extends Notifier<AsyncValue<void>> {
       }
 
       final authRepo = ref.read(authRepositoryProvider);
-      
+
       // Get current user
       final user = authRepo.currentUser;
       if (user == null) {
@@ -142,4 +245,3 @@ class ChangePasswordNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 }
-

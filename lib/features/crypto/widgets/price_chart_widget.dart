@@ -111,8 +111,9 @@ class PriceChartWidget extends ConsumerWidget {
                           showTitles: true,
                           reservedSize: 45,
                           getTitlesWidget: (value, meta) {
-                            if (value == minY || value == maxY)
+                            if (value == minY || value == maxY) {
                               return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: Text(

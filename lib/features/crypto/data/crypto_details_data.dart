@@ -55,6 +55,40 @@ class CryptoDetailsData {
     );
   }
 
+  static CryptoDetails getTronDetails() {
+    return CryptoDetails(
+      symbol: 'TRX',
+      name: 'TRON',
+      pair: 'TRX/USD',
+      currentPrice: 0.12,
+      change24h: 0.005,
+      changePercent24h: 4.35,
+      high24h: 0.125,
+      low24h: 0.115,
+      volumeBTC: 5000.0,
+      volumeUSD: 400000.0, // 400k
+      accentColor: AppColors.trxBackground,
+      priceHistory: _generatePriceHistory(0.12),
+    );
+  }
+
+  static CryptoDetails getPolkadotDetails() {
+    return CryptoDetails(
+      symbol: 'DOT',
+      name: 'Polkadot',
+      pair: 'DOT/USD',
+      currentPrice: 7.50,
+      change24h: -0.25,
+      changePercent24h: -3.2,
+      high24h: 7.80,
+      low24h: 7.20,
+      volumeBTC: 1500.0,
+      volumeUSD: 10000000.0, // 10M
+      accentColor: AppColors.dotBackground,
+      priceHistory: _generatePriceHistory(7.50),
+    );
+  }
+
   static CryptoDetails getDetailsBySymbol(String symbol) {
     switch (symbol.toUpperCase()) {
       case 'BTC':
@@ -63,6 +97,10 @@ class CryptoDetailsData {
         return getEthereumDetails();
       case 'SOL':
         return getSolanaDetails();
+      case 'TRX':
+        return getTronDetails();
+      case 'DOT':
+        return getPolkadotDetails();
       default:
         return getBitcoinDetails();
     }
@@ -71,7 +109,7 @@ class CryptoDetailsData {
   static List<PricePoint> _generatePriceHistory(double basePrice) {
     final now = DateTime.now();
     final List<PricePoint> history = [];
-    
+
     // Generate 50 data points for the last 24 hours
     for (int i = 50; i >= 0; i--) {
       final time = now.subtract(Duration(hours: i));
@@ -80,8 +118,7 @@ class CryptoDetailsData {
       final price = basePrice + variation;
       history.add(PricePoint(time: time, price: price));
     }
-    
+
     return history;
   }
 }
-

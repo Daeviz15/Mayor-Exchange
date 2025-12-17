@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../core/theme/app_colors.dart';
+
 import '../../../core/theme/app_text_styles.dart';
+import '../../notifications/widgets/notification_badge.dart';
 
 class DashboardHeader extends StatelessWidget {
   final VoidCallback? onNotificationTap;
@@ -28,8 +30,8 @@ class DashboardHeader extends StatelessWidget {
     String? networkAvatarUrl,
   }) {
     // Priority: Storage URL > Local Path
-    final imageUrl = networkAvatarUrl ?? 
-                     (localAvatarPath != null ? 'file://$localAvatarPath' : null);
+    final imageUrl = networkAvatarUrl ??
+        (localAvatarPath != null ? 'file://$localAvatarPath' : null);
 
     if (imageUrl == null) {
       return const Icon(
@@ -136,9 +138,7 @@ class DashboardHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      displayName?.isNotEmpty == true
-                          ? displayName!
-                          : 'User',
+                      displayName?.isNotEmpty == true ? displayName! : 'User',
                       style: AppTextStyles.titleLarge(context),
                     ),
                     if (email != null && email!.isNotEmpty)
@@ -151,20 +151,8 @@ class DashboardHeader extends StatelessWidget {
                 ),
               ],
             ),
-            GestureDetector(
-              onTap: onNotificationTap,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundCard,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_outlined,
-                  color: AppColors.textPrimary,
-                  size: 24,
-                ),
-              ),
+            NotificationBadge(
+              onTap: onNotificationTap ?? () {},
             ),
           ],
         ),

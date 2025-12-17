@@ -5,8 +5,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../providers/crypto_providers.dart';
 import '../widgets/price_chart_widget.dart';
 import '../widgets/crypto_data_card.dart';
-import '../widgets/order_form_widget.dart';
 import '../widgets/crypto_details_skeleton.dart';
+import '../../transactions/screens/buy_sell_crypto_screen.dart';
+import '../../transactions/models/transaction.dart';
 import '../../dasboard/widgets/bottom_nav_bar.dart';
 import '../../dasboard/screens/home_screen.dart';
 import '../../dasboard/screens/settings_screen.dart';
@@ -23,7 +24,8 @@ class CryptoDetailsScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CryptoDetailsScreen> createState() => _CryptoDetailsScreenState();
+  ConsumerState<CryptoDetailsScreen> createState() =>
+      _CryptoDetailsScreenState();
 }
 
 class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
@@ -32,265 +34,302 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cryptoDetailsAsync = ref.watch(cryptoDetailsProvider(widget.cryptoSymbol));
+    final cryptoDetailsAsync =
+        ref.watch(cryptoDetailsProvider(widget.cryptoSymbol));
     final selectedTimeRange = ref.watch(selectedTimeRangeProvider);
 
     return cryptoDetailsAsync.when(
       data: (cryptoDetails) {
         final isPositive = cryptoDetails.change24h >= 0;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Crypto Pair Selector
-                  GestureDetector(
-                    onTap: () {
-                      // Show crypto pair selector
-                    },
-                    child: Row(
-                      children: [
-                        Text(
-                          cryptoDetails.pair,
-                          style: AppTextStyles.titleLarge(context),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: AppColors.textSecondary,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Profile Icon
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundCard,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: AppColors.textPrimary,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Current Price and Change
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut,
-                      builder: (context, value, child) {
-                        return Opacity(
-                          opacity: value,
-                          child: Transform.translate(
-                            offset: Offset(0, -10 * (1 - value)),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '\$${cryptoDetails.currentPrice.toStringAsFixed(2)}',
-                            style: AppTextStyles.displayLarge(context).copyWith(
-                              fontSize: 36,
-                              fontWeight: FontWeight.w900,
+        return Scaffold(
+          backgroundColor: AppColors.backgroundDark,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Header
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Crypto Pair Selector
+                      GestureDetector(
+                        onTap: () {
+                          // Show crypto pair selector
+                        },
+                        child: Row(
+                          children: [
+                            Text(
+                              cryptoDetails.pair,
+                              style: AppTextStyles.titleLarge(context),
                             ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: AppColors.textSecondary,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Profile Icon
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.backgroundCard,
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                isPositive
-                                    ? Icons.trending_up
-                                    : Icons.trending_down,
-                                size: 16,
-                                color: isPositive
-                                    ? AppColors.success
-                                    : AppColors.error,
+                          child: const Icon(
+                            Icons.person,
+                            color: AppColors.textPrimary,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Current Price and Change
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOut,
+                          builder: (context, value, child) {
+                            return Opacity(
+                              opacity: value,
+                              child: Transform.translate(
+                                offset: Offset(0, -10 * (1 - value)),
+                                child: child,
                               ),
-                              const SizedBox(width: 4),
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                '${isPositive ? '+' : ''}\$${cryptoDetails.change24h.toStringAsFixed(2)} (${isPositive ? '+' : ''}${cryptoDetails.changePercent24h.toStringAsFixed(2)}%) 24H',
-                                style: AppTextStyles.percentageChange(
-                                  context,
-                                  isPositive,
-                                ).copyWith(fontSize: 16),
+                                '\$${cryptoDetails.currentPrice.toStringAsFixed(2)}',
+                                style: AppTextStyles.displayLarge(context)
+                                    .copyWith(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(
+                                    isPositive
+                                        ? Icons.trending_up
+                                        : Icons.trending_down,
+                                    size: 16,
+                                    color: isPositive
+                                        ? AppColors.success
+                                        : AppColors.error,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${isPositive ? '+' : ''}\$${cryptoDetails.change24h.toStringAsFixed(2)} (${isPositive ? '+' : ''}${cryptoDetails.changePercent24h.toStringAsFixed(2)}%) 24H',
+                                    style: AppTextStyles.percentageChange(
+                                      context,
+                                      isPositive,
+                                    ).copyWith(fontSize: 16),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Price Chart
-                    PriceChartWidget(
-                      cryptoSymbol: widget.cryptoSymbol,
-                      selectedRange: selectedTimeRange,
-                      onRangeChanged: (range) {
-                        ref.read(selectedTimeRangeProvider.notifier).setRange(range);
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Data Cards
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.5,
-                      children: [
-                        CryptoDataCard(
-                          label: '24h High',
-                          value: '\$${cryptoDetails.high24h.toStringAsFixed(2)}',
-                          icon: Icons.arrow_upward,
                         ),
-                        CryptoDataCard(
-                          label: '24h Low',
-                          value: '\$${cryptoDetails.low24h.toStringAsFixed(2)}',
-                          icon: Icons.arrow_downward,
-                        ),
-                        CryptoDataCard(
-                          label: 'Volume (${cryptoDetails.symbol})',
-                          value: '${_formatNumber(cryptoDetails.volumeBTC)} ${cryptoDetails.symbol}',
-                          icon: Icons.bar_chart,
-                        ),
-                        CryptoDataCard(
-                          label: 'Volume (USD)',
-                          value: '\$${_formatVolume(cryptoDetails.volumeUSD)}',
-                          icon: Icons.attach_money,
-                        ),
-                      ],
-                    ),
 
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 32),
 
-                    // Buy/Sell Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Buy',
-                            isPrimary: true,
-                            isSelected: _isBuyOrder,
-                            onTap: () {
-                              setState(() {
-                                _isBuyOrder = true;
-                              });
+                        // Price Chart
+                        PriceChartWidget(
+                          cryptoSymbol: widget.cryptoSymbol,
+                          selectedRange: selectedTimeRange,
+                          onRangeChanged: (range) {
+                            ref
+                                .read(selectedTimeRangeProvider.notifier)
+                                .setRange(range);
+                          },
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Data Cards
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.5,
+                          children: [
+                            CryptoDataCard(
+                              label: '24h High',
+                              value:
+                                  '\$${cryptoDetails.high24h.toStringAsFixed(2)}',
+                              icon: Icons.arrow_upward,
+                            ),
+                            CryptoDataCard(
+                              label: '24h Low',
+                              value:
+                                  '\$${cryptoDetails.low24h.toStringAsFixed(2)}',
+                              icon: Icons.arrow_downward,
+                            ),
+                            CryptoDataCard(
+                              label: 'Volume (${cryptoDetails.symbol})',
+                              value:
+                                  '${_formatNumber(cryptoDetails.volumeBTC)} ${cryptoDetails.symbol}',
+                              icon: Icons.bar_chart,
+                            ),
+                            CryptoDataCard(
+                              label: 'Volume (USD)',
+                              value:
+                                  '\$${_formatVolume(cryptoDetails.volumeUSD)}',
+                              icon: Icons.attach_money,
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Buy/Sell Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ActionButton(
+                                label: 'Buy',
+                                isPrimary: true,
+                                isSelected: _isBuyOrder,
+                                onTap: () {
+                                  setState(() {
+                                    _isBuyOrder = true;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _ActionButton(
+                                label: 'Sell',
+                                isPrimary: false,
+                                isSelected: !_isBuyOrder,
+                                onTap: () {
+                                  setState(() {
+                                    _isBuyOrder = false;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Order Form
+                        // Trade Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryOrange,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => BuySellCryptoScreen(
+                                    initialType: _isBuyOrder
+                                        ? TransactionType.buyCrypto
+                                        : TransactionType.sellCrypto,
+                                    initialAsset: cryptoDetails.symbol,
+                                  ),
+                                ),
+                              );
                             },
+                            child: Text(
+                              _isBuyOrder
+                                  ? 'Buy ${cryptoDetails.symbol}'
+                                  : 'Sell ${cryptoDetails.symbol}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Sell',
-                            isPrimary: false,
-                            isSelected: !_isBuyOrder,
-                            onTap: () {
-                              setState(() {
-                                _isBuyOrder = false;
-                              });
-                            },
-                          ),
-                        ),
+
+                        const SizedBox(height: 20),
                       ],
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Order Form
-                    OrderFormWidget(
-                      cryptoDetails: cryptoDetails,
-                      isBuyOrder: _isBuyOrder,
-                      onSubmit: () {
-                        // Handle order submission
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
 
-      // Bottom Navigation
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-
-          // Handle navigation
-          if (index == 0) {
-            // Home tab
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
-          } else if (index == 3) {
-            // Gift Cards tab
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const GiftCardsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            // Settings tab
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            ).then((_) {
+          // Bottom Navigation
+          bottomNavigationBar: AppBottomNavBar(
+            currentIndex: _currentNavIndex,
+            onTap: (index) {
               setState(() {
-                _currentNavIndex = 2;
+                _currentNavIndex = index;
               });
-            });
-          }
-        },
-      ),
-    );
+
+              // Handle navigation
+              if (index == 0) {
+                // Home tab
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              } else if (index == 3) {
+                // Gift Cards tab
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GiftCardsScreen(),
+                  ),
+                );
+              } else if (index == 4) {
+                // Settings tab
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const SettingsScreen()),
+                ).then((_) {
+                  setState(() {
+                    _currentNavIndex = 2;
+                  });
+                });
+              }
+            },
+          ),
+        );
       },
       loading: () => const CryptoDetailsSkeleton(),
       error: (error, stack) => Scaffold(
@@ -384,9 +423,8 @@ class _ActionButton extends StatelessWidget {
             label,
             style: AppTextStyles.titleMedium(context).copyWith(
               fontWeight: FontWeight.w700,
-              color: isSelected
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
+              color:
+                  isSelected ? AppColors.textPrimary : AppColors.textSecondary,
             ),
           ),
         ),
@@ -394,4 +432,3 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-

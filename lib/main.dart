@@ -5,6 +5,7 @@ import 'package:mayor_exchange/core/constants/supabase_constants.dart';
 import 'package:mayor_exchange/core/theme/app_theme.dart';
 import 'package:mayor_exchange/features/onboarding/screens/splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/widgets/offline_overlay.dart';
 
 Future<void> main() async {
   // Ensure Flutter is initialized
@@ -32,6 +33,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const SplashScreen(),
+      builder: (context, child) {
+        return OfflineOverlay(child: child!);
+      },
     );
   }
 }

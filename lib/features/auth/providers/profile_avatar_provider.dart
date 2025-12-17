@@ -15,7 +15,7 @@ class ProfileAvatarState {
   final String? localPath; // Temporary local cache
   final String? storageUrl; // Supabase Storage URL (persistent)
   final bool isUploading;
-  
+
   const ProfileAvatarState({
     this.localPath,
     this.storageUrl,
@@ -55,9 +55,9 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
         }
       });
     });
-    
+
     // Load from user metadata and local prefs
-    _loadAvatarUrl();
+    Future.microtask(() => _loadAvatarUrl());
     return const ProfileAvatarState();
   }
 
@@ -65,7 +65,7 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
     // First, try to get from current user metadata
     final authState = ref.read(authControllerProvider);
     final user = authState.value;
-    
+
     if (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty) {
       state = state.copyWith(storageUrl: user.avatarUrl);
       // Also cache in SharedPreferences for offline access
@@ -101,13 +101,13 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
 
       // Update user metadata with avatar URL
       await ref.read(supabaseClientProvider).auth.updateUser(
-        UserAttributes(
-          data: {
-            ...?user.userMetadata,
-            'avatar_url': publicUrl,
-          },
-        ),
-      );
+            UserAttributes(
+              data: {
+                ...?user.userMetadata,
+                'avatar_url': publicUrl,
+              },
+            ),
+          );
 
       // Cache locally for immediate display
       final cacheDir = await getTemporaryDirectory();
@@ -138,7 +138,7 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
   Future<void> clear() async {
     try {
       final user = ref.read(supabaseClientProvider).auth.currentUser;
-      
+
       // Delete from storage if URL exists
       if (state.storageUrl != null && user != null) {
         final storageService = ref.read(storageServiceProvider);
@@ -148,13 +148,13 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
       // Remove from user metadata
       if (user != null) {
         await ref.read(supabaseClientProvider).auth.updateUser(
-          UserAttributes(
-            data: {
-              ...?user.userMetadata,
-              'avatar_url': null,
-            },
-          ),
-        );
+              UserAttributes(
+                data: {
+                  ...?user.userMetadata,
+                  'avatar_url': null,
+                },
+              ),
+            );
       }
 
       // Clear local cache
@@ -171,4 +171,3 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
     }
   }
 }
-

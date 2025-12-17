@@ -9,7 +9,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      
+
       // Color Scheme
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primaryOrange,
@@ -31,7 +31,8 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: GoogleFonts.workSans(
+        titleTextStyle: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
           fontSize: 23,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -58,7 +59,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.workSans(
+          textStyle: GoogleFonts.getFont(
+            'Plus Jakarta Sans',
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -69,7 +71,8 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primaryOrange,
-          textStyle: GoogleFonts.workSans(
+          textStyle: GoogleFonts.getFont(
+            'Plus Jakarta Sans',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -90,14 +93,17 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primaryOrange, width: 2),
+          borderSide:
+              const BorderSide(color: AppColors.primaryOrange, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.error, width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: GoogleFonts.workSans(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
           color: AppColors.textTertiary,
           fontSize: 14,
         ),
@@ -134,89 +140,101 @@ class AppTheme {
       ),
 
       // Text Theme
-      textTheme: GoogleFonts.workSansTextTheme(
-        const TextTheme(
-          displayLarge: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
-          ),
-          displayMedium: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
-          ),
-          displaySmall: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.3,
-          ),
-          headlineLarge: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-          headlineMedium: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-          headlineSmall: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-          titleMedium: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-          titleSmall: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-          bodyLarge: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textPrimary,
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary,
-          ),
-          bodySmall: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textTertiary,
-          ),
-          labelLarge: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-          labelMedium: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-          labelSmall: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textTertiary,
-          ),
+      textTheme: TextTheme(
+        displayLarge: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 32,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.5,
+        ),
+        displayMedium: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.5,
+        ),
+        displaySmall: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.3,
+        ),
+        headlineLarge: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+        headlineMedium: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+        ),
+        headlineSmall: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+        titleLarge: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 23,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        titleMedium: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+        ),
+        titleSmall: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        bodyLarge: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textPrimary,
+        ),
+        bodyMedium: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
+        ),
+        bodySmall: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textTertiary,
+        ),
+        labelLarge: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        labelMedium: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
+        labelSmall: GoogleFonts.getFont(
+          'Plus Jakarta Sans',
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textTertiary,
         ),
       ),
     );
   }
 }
-

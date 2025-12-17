@@ -97,8 +97,10 @@ class CryptoDetailsSkeleton extends StatelessWidget {
                           5,
                           (index) => const Expanded(
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              child: SkeletonText(width: double.infinity, height: 24),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 8),
+                              child: SkeletonText(
+                                  width: double.infinity, height: 24),
                             ),
                           ),
                         ),
@@ -114,7 +116,7 @@ class CryptoDetailsSkeleton extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 1.5,
+                      childAspectRatio: 1.35,
                       children: List.generate(
                         4,
                         (index) => Container(
@@ -127,7 +129,7 @@ class CryptoDetailsSkeleton extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SkeletonCircle(diameter: 20),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 10),
                               const SkeletonText(width: 80, height: 14),
                               const SizedBox(height: 8),
                               const SkeletonText(width: 100, height: 18),
@@ -174,9 +176,11 @@ class CryptoDetailsSkeleton extends StatelessWidget {
                         children: [
                           const SkeletonText(width: 120, height: 18),
                           const SizedBox(height: 16),
-                          const SkeletonText(width: double.infinity, height: 50),
+                          const SkeletonText(
+                              width: double.infinity, height: 50),
                           const SizedBox(height: 12),
-                          const SkeletonText(width: double.infinity, height: 50),
+                          const SkeletonText(
+                              width: double.infinity, height: 50),
                           const SizedBox(height: 20),
                           SkeletonLoader(
                             width: double.infinity,
@@ -198,4 +202,3 @@ class CryptoDetailsSkeleton extends StatelessWidget {
     );
   }
 }
-

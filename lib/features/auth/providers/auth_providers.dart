@@ -32,7 +32,7 @@ class AuthController extends AsyncNotifier<AppUser?> {
       next.whenData((authState) {
         final session = authState.session;
         final event = authState.event;
-        
+
         if (session != null &&
             (event == AuthChangeEvent.signedIn ||
                 event == AuthChangeEvent.tokenRefreshed ||
@@ -56,7 +56,7 @@ class AuthController extends AsyncNotifier<AppUser?> {
   Future<void> _refreshUser() async {
     final repo = ref.read(authRepositoryProvider);
     final user = repo.currentUser;
-    
+
     if (user == null) {
       state = const AsyncData(null);
       return;
@@ -119,10 +119,10 @@ class AuthController extends AsyncNotifier<AppUser?> {
     state = const AsyncLoading();
     final repo = ref.read(authRepositoryProvider);
     await repo.signOut();
-    
+
     // Clear all cached data on signout
     await _clearCache();
-    
+
     state = const AsyncData(null);
   }
 
@@ -137,9 +137,11 @@ class AuthController extends AsyncNotifier<AppUser?> {
   AppUser _mapUser(User user) {
     final metadata = user.userMetadata ?? <String, dynamic>{};
     String? fullName;
-    if (metadata['full_name'] is String && metadata['full_name'].toString().trim().isNotEmpty) {
+    if (metadata['full_name'] is String &&
+        metadata['full_name'].toString().trim().isNotEmpty) {
       fullName = metadata['full_name'] as String?;
-    } else if (metadata['name'] is String && metadata['name'].toString().trim().isNotEmpty) {
+    } else if (metadata['name'] is String &&
+        metadata['name'].toString().trim().isNotEmpty) {
       fullName = metadata['name'] as String?;
     } else {
       final first = metadata['firstName'] as String?;
@@ -155,18 +157,47 @@ class AuthController extends AsyncNotifier<AppUser?> {
     }
 
     final avatarUrl = metadata['avatar_url'] as String?;
+    final phoneNumber = metadata['phone_number'] as String?;
+    final address = metadata['address'] as String?;
+    DateTime? dateOfBirth;
+    if (metadata['date_of_birth'] != null) {
+      dateOfBirth = DateTime.tryParse(metadata['date_of_birth'] as String);
+    }
 
     return AppUser(
       id: user.id,
       email: user.email ?? '',
       fullName: fullName?.trim().isEmpty == true ? null : fullName?.trim(),
       avatarUrl: avatarUrl,
+      phoneNumber: phoneNumber,
+      address: address,
+      dateOfBirth: dateOfBirth,
       createdAt: DateTime.parse(user.createdAt),
     );
+  }
+
+  Future<void> updateProfile({
+    String? fullName,
+    String? phoneNumber,
+    String? address,
+    DateTime? dateOfBirth,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final updatedUser = await repo.updateProfile(
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        address: address,
+        dateOfBirth: dateOfBirth,
+      );
+      state = AsyncData(updatedUser);
+    } catch (e, stackTrace) {
+      state = AsyncError(e, stackTrace);
+      rethrow;
+    }
   }
 }
 
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AppUser?>(AuthController.new);
-
-

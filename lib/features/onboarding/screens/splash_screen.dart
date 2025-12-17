@@ -4,6 +4,9 @@ import 'package:mayor_exchange/features/onboarding/screens/onboarding_screen.dar
 import 'package:mayor_exchange/features/dasboard/screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:mayor_exchange/features/auth/screens/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -37,14 +40,23 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigate after delay; if a session exists, go straight to dashboard.
-    Future.delayed(const Duration(seconds: 3), () {
+    // Navigate after delay
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
-      final session = Supabase.instance.client.auth.currentSession;
-      final target = session != null
-          ? const HomeScreen()
-          : const OnboardingScreen();
 
+      final session = Supabase.instance.client.auth.currentSession;
+
+      Widget target;
+      if (session != null) {
+        target = const HomeScreen();
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
+        target =
+            seenOnboarding ? const LoginScreen() : const OnboardingScreen();
+      }
+
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(

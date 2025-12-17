@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Handles file uploads to Supabase Storage
 class StorageService {
   final SupabaseClient _supabaseClient;
-  static const String _profileBucket = 'profile-images';
+  static const String _profileBucket = 'profile-image';
 
   StorageService(this._supabaseClient);
 
@@ -63,6 +63,31 @@ class StorageService {
       }
     } catch (e) {
       throw Exception('Failed to upload profile image: $e');
+    }
+  }
+
+  /// Generic upload file to Supabase Storage
+  Future<String> uploadFile({
+    required File file,
+    required String bucket,
+    required String path,
+  }) async {
+    try {
+      await _supabaseClient.storage.from(bucket).upload(
+            path,
+            file,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg', // Assuming images for now
+            ),
+          );
+
+      // Return path or signed URL?
+      // Since these buckets are PRIVATE, we cannot use public URL.
+      // We should return the path so the frontend can request signed URL later.
+      return path;
+    } catch (e) {
+      throw Exception('Failed to upload file to $bucket: $e');
     }
   }
 

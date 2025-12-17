@@ -3,6 +3,9 @@ class AppUser {
   final String email;
   final String? fullName;
   final String? avatarUrl;
+  final String? phoneNumber;
+  final DateTime? dateOfBirth;
+  final String? address;
   final DateTime createdAt;
 
   AppUser({
@@ -10,6 +13,9 @@ class AppUser {
     required this.email,
     this.fullName,
     this.avatarUrl,
+    this.phoneNumber,
+    this.dateOfBirth,
+    this.address,
     required this.createdAt,
   });
 
@@ -19,6 +25,11 @@ class AppUser {
       email: json['email'] as String,
       fullName: json['full_name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
+      phoneNumber: json['phone_number'] as String?,
+      dateOfBirth: json['date_of_birth'] != null
+          ? DateTime.parse(json['date_of_birth'] as String)
+          : null,
+      address: json['address'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -29,6 +40,9 @@ class AppUser {
       'email': email,
       'full_name': fullName,
       'avatar_url': avatarUrl,
+      'phone_number': phoneNumber,
+      'date_of_birth': dateOfBirth?.toIso8601String(),
+      'address': address,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -38,6 +52,9 @@ class AppUser {
     String? email,
     String? fullName,
     String? avatarUrl,
+    String? phoneNumber,
+    DateTime? dateOfBirth,
+    String? address,
     DateTime? createdAt,
   }) {
     return AppUser(
@@ -45,6 +62,9 @@ class AppUser {
       email: email ?? this.email,
       fullName: fullName ?? this.fullName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      address: address ?? this.address,
       createdAt: createdAt ?? this.createdAt,
     );
   }

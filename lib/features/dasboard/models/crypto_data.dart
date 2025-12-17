@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 /// Crypto Data Model
 /// Represents cryptocurrency market data
 class CryptoData {
+  final String id;
   final String symbol;
   final String name;
   final double price;
@@ -13,6 +14,7 @@ class CryptoData {
   final List<double> chartData; // Simple price history for chart
 
   CryptoData({
+    required this.id,
     required this.symbol,
     required this.name,
     required this.price,

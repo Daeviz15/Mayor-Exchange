@@ -9,7 +9,8 @@ class AppColors {
   static const Color primaryOrangeDark = Color(0xFFCC2E0A);
 
   // Background Colors
-  static const Color backgroundDark = Color(0xFF221910); // Main dark brown background
+  static const Color backgroundDark =
+      Color(0xFF221910); // Main dark brown background
   static const Color backgroundCard = Color(0xFF2A1F15); // Card dark brown
   static const Color backgroundCardLight = Color(0xFF332A20);
   static const Color backgroundElevated = Color(0xFF3A2F25);
@@ -36,6 +37,8 @@ class AppColors {
   static const Color btcBackground = Color(0xFFFF9800);
   static const Color ethBackground = Color(0xFF627EEA);
   static const Color solBackground = Color(0xFF9945FF);
+  static const Color trxBackground = Color(0xFFFF0013); // TRON Red
+  static const Color dotBackground = Color(0xFFE6007A); // Polkadot Pink
 
   // Avatar Colors
   static const Color avatarBackground = Color(0xFF4CAF50);
@@ -57,4 +60,3 @@ class AppColors {
   // Private constructor to prevent instantiation
   AppColors._();
 }
-
