@@ -22,6 +22,8 @@ class _AdminTransactionDetailScreenState
     extends ConsumerState<AdminTransactionDetailScreen> {
   bool _isLoading = false;
   final _noteController = TextEditingController();
+  final _bankDetailsController = TextEditingController();
+  final _giftCardInfoController = TextEditingController();
 
   Future<void> _handleAction(Future<void> Function() action) async {
     setState(() => _isLoading = true);
@@ -46,7 +48,9 @@ class _AdminTransactionDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    final transaction = widget.transaction;
+    final transactionId = widget.transaction.id;
+    final transactionAsync =
+        ref.watch(singleTransactionProvider(transactionId));
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -59,131 +63,152 @@ class _AdminTransactionDetailScreenState
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color:
-                    _getStatusColor(transaction.status).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _getStatusColor(transaction.status)),
-              ),
-              child: Text(
-                transaction.status.name.toUpperCase(),
-                style: AppTextStyles.labelMedium(context).copyWith(
-                  color: _getStatusColor(transaction.status),
-                  fontWeight: FontWeight.bold,
-                ),
+      body: transactionAsync.when(
+        loading: () => _buildContent(widget.transaction, isLoading: true),
+        error: (err, stack) => Center(
+            child:
+                Text('Error: $err', style: const TextStyle(color: Colors.red))),
+        data: (liveTransaction) {
+          final transaction = liveTransaction ?? widget.transaction;
+          return _buildContent(transaction);
+        },
+      ),
+    );
+  }
+
+  Widget _buildContent(TransactionModel transaction, {bool isLoading = false}) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isLoading) const LinearProgressIndicator(),
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _getStatusColor(transaction.status).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _getStatusColor(transaction.status)),
+            ),
+            child: Text(
+              transaction.status.name.toUpperCase(),
+              style: AppTextStyles.labelMedium(context).copyWith(
+                color: _getStatusColor(transaction.status),
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 20),
+          ),
+          const SizedBox(height: 20),
 
-            // Key Details
-            _buildDetailRow('Transaction ID', transaction.id.substring(0, 8)),
-            _buildDetailRow('Type', transaction.type.name.toUpperCase()),
-            _buildDetailRow('Amount (Fiat)',
-                '₦${transaction.amountFiat.toStringAsFixed(2)}'),
-            if (transaction.details.containsKey('usd_input'))
-              _buildDetailRow(
-                  'USD Input', '\$${transaction.details['usd_input']}'),
-            if (transaction.amountCrypto != null)
-              _buildDetailRow('Amount (Crypto)',
-                  '${transaction.amountCrypto} ${transaction.currencyPair.split('/').first}'),
-            _buildDetailRow('Currency Pair', transaction.currencyPair),
-            if (transaction.details.containsKey('fx_rate_applied'))
-              _buildDetailRow(
-                  'FX Rate', '₦${transaction.details['fx_rate_applied']}/USD'),
-            _buildDetailRow('User ID', transaction.userId),
-            _buildDetailRow('Created At', transaction.createdAt.toString()),
+          // Key Details
+          _buildDetailRow('Transaction ID', transaction.id.substring(0, 8)),
+          _buildDetailRow('Type', transaction.type.name.toUpperCase()),
+          _buildDetailRow('Amount (Fiat)',
+              '${transaction.details['currency_symbol'] ?? '₦'}${transaction.amountFiat.toStringAsFixed(2)}'),
+          if (transaction.details.containsKey('usd_input'))
+            _buildDetailRow(
+                'USD Input', '\$${transaction.details['usd_input']}'),
+          if (transaction.amountCrypto != null)
+            _buildDetailRow('Amount (Crypto)',
+                '${transaction.amountCrypto} ${transaction.currencyPair.split('/').first}'),
+          _buildDetailRow('Currency Pair', transaction.currencyPair),
+          if (transaction.details.containsKey('fx_rate_applied'))
+            _buildDetailRow(
+                'FX Rate', '₦${transaction.details['fx_rate_applied']}/USD'),
+          _buildDetailRow('User ID', transaction.userId),
+          _buildDetailRow('Created At', transaction.createdAt.toString()),
 
-            const SizedBox(height: 20),
-            const Divider(color: AppColors.divider),
-            const SizedBox(height: 20),
+          const SizedBox(height: 20),
+          const Divider(color: AppColors.divider),
+          const SizedBox(height: 20),
 
-            // JSON Details (Bank info, wallet address, etc.)
-            Text('Technical Details',
+          // JSON Details (Bank info, wallet address, etc.)
+          Text('Technical Details', style: AppTextStyles.titleMedium(context)),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundCard,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: transaction.details.entries.map((e) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${e.key}: ',
+                          style: AppTextStyles.bodyMedium(context).copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textSecondary)),
+                      Expanded(
+                          child: Text('${e.value}',
+                              style: AppTextStyles.bodyMedium(context))),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Proof Image (if any)
+          if (transaction.proofImagePath != null) ...[
+            Text(
+                transaction.type == TransactionType.sellGiftCard
+                    ? 'Card Image'
+                    : 'Proof of Payment',
                 style: AppTextStyles.titleMedium(context)),
             const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundCard,
-                borderRadius: BorderRadius.circular(12),
+            FutureBuilder<String>(
+              future: _getSignedUrl(
+                ref,
+                transaction.proofImagePath!,
+                bucket: transaction.type == TransactionType.sellGiftCard
+                    ? 'gift-cards'
+                    : 'transaction-proofs',
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: transaction.details.entries.map((e) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${e.key}: ',
-                            style: AppTextStyles.bodyMedium(context).copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textSecondary)),
-                        Expanded(
-                            child: Text('${e.value}',
-                                style: AppTextStyles.bodyMedium(context))),
-                      ],
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: RocketLoader(color: AppColors.primaryOrange));
+                }
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return const Text('Error loading image',
+                      style: TextStyle(color: Colors.red));
+                }
+                return GestureDetector(
+                  onTap: () {
+                    // Optionally show full screen
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      snapshot.data!,
+                      height: 300,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image, color: Colors.grey),
                     ),
-                  );
-                }).toList(),
-              ),
+                  ),
+                );
+              },
             ),
-
-            const SizedBox(height: 20),
-
-            // Proof Image (if any)
-            if (transaction.proofImagePath != null) ...[
-              Text('Proof of Payment',
-                  style: AppTextStyles.titleMedium(context)),
-              const SizedBox(height: 10),
-              FutureBuilder<String>(
-                future: _getSignedUrl(ref, transaction.proofImagePath!),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                        child: RocketLoader(color: AppColors.primaryOrange));
-                  }
-                  if (snapshot.hasError || !snapshot.hasData) {
-                    return const Text('Error loading image',
-                        style: TextStyle(color: Colors.red));
-                  }
-                  return GestureDetector(
-                    onTap: () {
-                      // Optionally show full screen
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        snapshot.data!,
-                        height: 300,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image, color: Colors.grey),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-
-            const SizedBox(height: 40),
-
-            // Actions Area
-            if (transaction.status != TransactionStatus.completed &&
-                transaction.status != TransactionStatus.rejected)
-              _buildActionButtons(context, ref, transaction),
           ],
-        ),
+
+          const SizedBox(height: 40),
+
+          // Actions Area
+          if (transaction.status != TransactionStatus.completed &&
+              transaction.status != TransactionStatus.rejected)
+            _buildActionButtons(context, ref, transaction),
+        ],
       ),
     );
   }
@@ -233,19 +258,77 @@ class _AdminTransactionDetailScreenState
     // 2. Claimed -> Process (Depends on type)
     // 2. Claimed -> Process (Depends on type)
     if (transaction.status == TransactionStatus.claimed) {
+      final isBuyRequest = transaction.type == TransactionType.buyGiftCard ||
+          transaction.type == TransactionType.buyCrypto;
+
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildActionButton(
-            'Mark Payment Sent',
-            Colors.purple,
-            () => service.updateStatus(
-              transactionId: transaction.id,
-              targetUserId: transaction.userId,
-              newStatus: TransactionStatus.paymentPending,
-              previousStatus: transaction.status,
-              note: 'Admin marked payment as sent',
+          if (isBuyRequest) ...[
+            Text('Payment Instructions / Bank Details:',
+                style: AppTextStyles.bodySmall(context)
+                    .copyWith(color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bankDetailsController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText:
+                    'Enter bank details or wallet address for user to pay...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: AppColors.backgroundCard,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
             ),
-          ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              'Send Payment Details',
+              Colors.purple,
+              () async {
+                if (_bankDetailsController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Enter payment details')));
+                  return;
+                }
+
+                // Merge with existing details
+                final newDetails =
+                    Map<String, dynamic>.from(transaction.details);
+                newDetails['admin_bank_details'] =
+                    _bankDetailsController.text.trim();
+
+                await service.updateStatus(
+                  transactionId: transaction.id,
+                  targetUserId: transaction.userId,
+                  newStatus: TransactionStatus.paymentPending,
+                  previousStatus: transaction.status,
+                  note: 'Admin sent payment details',
+                  details: newDetails,
+                  notificationMessage:
+                      'Order Accepted. Please view order history to view payment details.',
+                );
+              },
+            ),
+          ] else ...[
+            // For Sell requests, we might just mark as payment sent if we paid them externally
+            // Or if we need to send them money first (unlikely for sell, usually they send assets first)
+            _buildActionButton(
+              'Mark Payment Sent',
+              Colors.purple,
+              () => service.updateStatus(
+                transactionId: transaction.id,
+                targetUserId: transaction.userId,
+                newStatus: TransactionStatus.completed,
+                previousStatus: transaction.status,
+                note: 'Admin sent payment to user bank',
+                notificationMessage:
+                    'Payment sent to your bank! Transaction Completed.',
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           _buildActionButton(
             'Pending Verification',
@@ -265,18 +348,59 @@ class _AdminTransactionDetailScreenState
     // 3. Verification/Payment Pending -> Approve/Reject
     if (transaction.status == TransactionStatus.verificationPending ||
         transaction.status == TransactionStatus.paymentPending) {
+      final isBuyGiftCard = transaction.type == TransactionType.buyGiftCard;
+
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isBuyGiftCard) ...[
+            Text('Gift Card Code / Details:',
+                style: AppTextStyles.bodySmall(context)
+                    .copyWith(color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _giftCardInfoController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Enter code or details for user...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: AppColors.backgroundCard,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           _buildActionButton(
             'Approve & Complete',
             Colors.green,
-            () => service.updateStatus(
-              transactionId: transaction.id,
-              targetUserId: transaction.userId,
-              newStatus: TransactionStatus.completed,
-              previousStatus: transaction.status,
-              note: 'Admin approved and completed transaction',
-            ),
+            () async {
+              // Merge details
+              final newDetails = Map<String, dynamic>.from(transaction.details);
+
+              if (isBuyGiftCard) {
+                if (_giftCardInfoController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please enter Gift Card details')));
+                  return;
+                }
+                newDetails['gift_card_info'] =
+                    _giftCardInfoController.text.trim();
+              }
+
+              await service.updateStatus(
+                transactionId: transaction.id,
+                targetUserId: transaction.userId,
+                newStatus: TransactionStatus.completed,
+                previousStatus: transaction.status,
+                note: 'Admin approved and completed transaction',
+                details: newDetails,
+                notificationMessage: isBuyGiftCard
+                    ? 'Transaction Completed! View details for your code.'
+                    : null,
+              );
+            },
           ),
           const SizedBox(height: 12),
           _buildActionButton(
@@ -330,20 +454,19 @@ class _AdminTransactionDetailScreenState
     );
   }
 
-  Future<String> _getSignedUrl(WidgetRef ref, String path) async {
+  Future<String> _getSignedUrl(WidgetRef ref, String path,
+      {String bucket = 'transaction-proofs'}) async {
     final client = ref.read(supabaseClientProvider);
 
     // Fix: Remove bucket name if present in the path
     String cleanPath = path;
-    const bucketName = 'transaction-proofs';
-
-    if (cleanPath.startsWith('$bucketName/')) {
-      cleanPath = cleanPath.replaceFirst('$bucketName/', '');
+    if (cleanPath.startsWith('$bucket/')) {
+      cleanPath = cleanPath.replaceFirst('$bucket/', '');
     }
 
     // Generate signed URL valid for 60 seconds (or more)
     final url = await client.storage
-        .from(bucketName)
+        .from(bucket)
         .createSignedUrl(cleanPath, 3600); // 1 hour
     return url;
   }

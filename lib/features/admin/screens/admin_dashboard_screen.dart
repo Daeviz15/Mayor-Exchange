@@ -12,6 +12,8 @@ import 'admin_kyc_list_screen.dart';
 
 import '../../../core/widgets/rocket_loader.dart';
 
+import '../providers/admin_notification_provider.dart';
+
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -38,6 +40,31 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Listen for notifications
+    ref.listen<AdminNotification?>(adminNotificationProvider,
+        (_, notification) {
+      if (notification != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(notification.title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.white)),
+                Text(notification.message,
+                    style: const TextStyle(color: Colors.white)),
+              ],
+            ),
+            backgroundColor: AppColors.primaryOrange,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -203,7 +230,7 @@ class _TransactionCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(
-          '${transaction.type.name.toUpperCase()} - ${transaction.amountFiat} ₦',
+          '${transaction.type.name.toUpperCase()} - ${transaction.details['currency_symbol'] ?? '₦'}${transaction.amountFiat}',
           style: AppTextStyles.titleSmall(context),
         ),
         subtitle: Column(

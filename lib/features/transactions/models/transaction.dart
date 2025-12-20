@@ -2,7 +2,9 @@ enum TransactionType {
   buyCrypto('buy_crypto'),
   sellCrypto('sell_crypto'),
   buyGiftCard('buy_giftcard'),
-  sellGiftCard('sell_giftcard');
+  sellGiftCard('sell_giftcard'),
+  deposit('deposit'),
+  withdrawal('withdrawal');
 
   final String value;
   const TransactionType(this.value);
@@ -18,8 +20,8 @@ enum TransactionType {
 enum TransactionStatus {
   pending('pending'),
   claimed('claimed'),
-  paymentPending('payment_pending'),
-  verificationPending('verification_pending'),
+  paymentPending('payment_pending'), // Added
+  verificationPending('verification_pending'), // Added
   completed('completed'),
   rejected('rejected'),
   cancelled('cancelled');

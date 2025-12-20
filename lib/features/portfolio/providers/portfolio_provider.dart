@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../dasboard/providers/balance_provider.dart';
+
 import '../../crypto/providers/crypto_providers.dart';
+import '../../dasboard/models/crypto_data.dart';
+import '../../transactions/models/transaction.dart';
+import '../../transactions/providers/transaction_service.dart';
+import '../../transactions/providers/rates_provider.dart';
 
 class PortfolioItem {
   final String id;
@@ -37,15 +41,64 @@ class PortfolioState {
 }
 
 final portfolioProvider = Provider<PortfolioState>((ref) {
-  final balanceState = ref.watch(balanceProvider);
-  // Keep watch to trigger updates, even if unused locally for now
-  // ignore: unused_local_variable
+  final transactionsAsync = ref.watch(userTransactionsProvider);
   final cryptoListAsync = ref.watch(cryptoListProvider);
+  final ratesAsync = ref.watch(ratesProvider);
 
-  double fiatBalance = balanceState.totalBalance;
+  // Default empty state
+  if (transactionsAsync.isLoading) {
+    return PortfolioState();
+  }
+
+  final transactions = transactionsAsync.value ?? [];
+  final cryptoList = cryptoListAsync.value ?? [];
+  final rates = ratesAsync.value ?? [];
+
+  double fiatBalance = 0.0;
+  final Map<String, double> cryptoHoldings = {};
+
+  for (final t in transactions) {
+    if (t.status != TransactionStatus.completed) continue;
+
+    switch (t.type) {
+      case TransactionType.deposit:
+        fiatBalance += t.amountFiat;
+        break;
+      case TransactionType.withdrawal:
+        fiatBalance -= t.amountFiat;
+        break;
+      case TransactionType.buyCrypto:
+        fiatBalance -= t.amountFiat;
+        final asset = t.details['asset']?.toString().toUpperCase() ?? '';
+        final amount = t.amountCrypto ?? 0.0;
+        if (asset.isNotEmpty) {
+          cryptoHoldings[asset] = (cryptoHoldings[asset] ?? 0.0) + amount;
+        }
+        break;
+      case TransactionType.sellCrypto:
+        fiatBalance += t.amountFiat;
+        final asset = t.details['asset']?.toString().toUpperCase() ?? '';
+        final amount = t.amountCrypto ?? 0.0;
+        if (asset.isNotEmpty) {
+          cryptoHoldings[asset] = (cryptoHoldings[asset] ?? 0.0) - amount;
+        }
+        break;
+      case TransactionType.buyGiftCard:
+        fiatBalance -= t.amountFiat;
+        break;
+      case TransactionType.sellGiftCard:
+        fiatBalance += t.amountFiat;
+        break;
+    }
+  }
+
+  // Ensure no negative balances from weird data
+  if (fiatBalance < 0) fiatBalance = 0.0;
+
   List<PortfolioItem> items = [];
+  double cryptoTotalValue = 0.0;
 
-  // Add Fiat
+  // Add Fiat Item
   if (fiatBalance > 0) {
     items.add(PortfolioItem(
       id: 'naira',
@@ -57,80 +110,53 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
     ));
   }
 
-  // Placeholder for real crypto wallet integration
-  double cryptoTotal = 0.0;
-  final totalValue = fiatBalance + cryptoTotal;
+  // Process Crypto Items
+  cryptoHoldings.forEach((symbol, quantity) {
+    if (quantity <= 0) return;
 
-  return PortfolioState(
-    totalValue: totalValue,
-    items: items,
-    fiatPercentage: totalValue == 0 ? 0 : (fiatBalance / totalValue) * 100,
-    cryptoPercentage: totalValue == 0 ? 0 : (cryptoTotal / totalValue) * 100,
-  );
-});
-
-// Mock Provider for demonstration
-final mockPortfolioProvider = Provider<PortfolioState>((ref) {
-  final balanceState = ref.watch(balanceProvider);
-  // Get the list of available coins (market data)
-  final cryptoList = ref.watch(cryptoListProvider).asData?.value ?? [];
-
-  double fiatBalance = balanceState.totalBalance;
-  // If user has 0 balance, pretend they have some for the "Stunning UI" demo
-  if (fiatBalance == 0) fiatBalance = 150000.0;
-
-  List<PortfolioItem> items = [];
-
-  // Add Fiat
-  items.add(PortfolioItem(
-    id: 'naira',
-    name: 'Nigerian Naira',
-    symbol: 'NGN',
-    quantity: fiatBalance,
-    valueInNaira: fiatBalance,
-    isFiat: true,
-  ));
-
-  double cryptoTotal = 0.0;
-
-  if (cryptoList.isNotEmpty) {
-    // Mock: User owns some crypto based on what's available in the market list
-    // We limit to 3 items for a clean demo
-    for (var i = 0; i < cryptoList.length && i < 3; i++) {
-      final crypto = cryptoList[i]; // This is CryptoData
-      final qty = (i + 1) * 0.5; // Arbitrary quantity
-      final val = qty * crypto.price;
-      cryptoTotal += val;
-
-      items.add(PortfolioItem(
-        id: crypto.id,
-        name: crypto.name,
-        symbol: crypto.symbol.toUpperCase(),
-        quantity: qty,
-        valueInNaira: val,
-        iconUrl: crypto.iconUrl,
-        isFiat: false,
-      ));
+    // 1. Get Metadata (Name, Icon) from CoinGecko (Rich UI)
+    CryptoData? cryptoMeta;
+    try {
+      cryptoMeta =
+          cryptoList.firstWhere((c) => c.symbol.toUpperCase() == symbol);
+    } catch (_) {
+      cryptoMeta = null;
     }
-  } else {
-    // Fallback mocks if API is down or empty
+
+    // 2. Get Price from Admin Rates (Authentic Valuation)
+    // We use SELL RATE because Net Worth = what you get if you sell.
+    double price = 0.0;
+    try {
+      final rate =
+          rates.firstWhere((r) => r.assetSymbol.toUpperCase() == symbol);
+      price = rate.sellRate;
+    } catch (_) {
+      // If no admin rate is set, the value is effectively 0 in our system
+      // independent of global market price.
+      price = 0.0;
+    }
+
+    final valueInNaira = quantity * price;
+    cryptoTotalValue += valueInNaira;
+
     items.add(PortfolioItem(
-      id: 'bitcoin',
-      name: 'Bitcoin',
-      symbol: 'BTC',
-      quantity: 0.05,
-      valueInNaira: 3500000,
+      id: symbol.toLowerCase(),
+      name: cryptoMeta?.name ?? symbol,
+      symbol: symbol,
+      quantity: quantity,
+      valueInNaira: valueInNaira,
+      iconUrl: cryptoMeta?.iconUrl,
       isFiat: false,
     ));
-    cryptoTotal += 3500000;
-  }
+  });
 
-  final totalValue = fiatBalance + cryptoTotal;
+  final totalValue = fiatBalance + cryptoTotalValue;
 
   return PortfolioState(
     totalValue: totalValue,
     items: items,
     fiatPercentage: totalValue == 0 ? 0 : (fiatBalance / totalValue) * 100,
-    cryptoPercentage: totalValue == 0 ? 0 : (cryptoTotal / totalValue) * 100,
+    cryptoPercentage:
+        totalValue == 0 ? 0 : (cryptoTotalValue / totalValue) * 100,
   );
 });

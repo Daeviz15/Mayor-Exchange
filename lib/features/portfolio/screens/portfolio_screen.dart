@@ -23,7 +23,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     // But ideally we use portfolioProvider. Let's use mockPortfolioProvider to ensure
     // the user sees the charts populated as they requested "make it excellent".
     // Switches to portfolioProvider later.
-    final portfolioState = ref.watch(mockPortfolioProvider);
+    final portfolioState = ref.watch(portfolioProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,

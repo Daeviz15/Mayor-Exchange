@@ -20,11 +20,17 @@ class AppUser {
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
+    final metadata = json['user_metadata'] as Map<String, dynamic>?;
+    final customAvatar = metadata?['custom_avatar_url'] as String?;
+    final defaultAvatar = json['avatar_url'] as String?;
+
     return AppUser(
       id: json['id'] as String,
       email: json['email'] as String,
       fullName: json['full_name'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
+      avatarUrl: (customAvatar != null && customAvatar.isNotEmpty)
+          ? customAvatar
+          : defaultAvatar,
       phoneNumber: json['phone_number'] as String?,
       dateOfBirth: json['date_of_birth'] != null
           ? DateTime.parse(json['date_of_birth'] as String)

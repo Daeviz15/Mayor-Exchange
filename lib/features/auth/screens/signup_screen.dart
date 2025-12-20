@@ -271,9 +271,9 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen>
 
                 // Firstname field
                 _buildFormField(
-                  label: 'Firstname',
+                  label: 'Fullname',
                   controller: _firstNameController,
-                  hintText: 'Placeholder Here',
+                  hintText: 'David Felix',
                 ),
 
                 const SizedBox(height: 20),

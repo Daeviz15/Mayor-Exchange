@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:mayor_exchange/features/notifications/screens/notification_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../auth/providers/auth_providers.dart';
@@ -15,6 +16,8 @@ import '../../admin/providers/admin_role_provider.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import 'personal_details_screen.dart';
 import '../../kyc/screens/kyc_verification_screen.dart';
+import '../../settings/screens/theme_screen.dart';
+import '../../../core/theme/theme_provider.dart';
 
 /// Settings Screen
 /// User settings and profile management screen
@@ -277,22 +280,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader('Account Setting'),
               SettingsItem(
                 title: 'Notifications',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const NotificationScreen()));
+                },
               ),
-              SettingsItem(
-                title: 'Theme',
-                trailing: Row(
-                  children: [
-                    Text('Dark',
-                        style: AppTextStyles.bodySmall(context)
-                            .copyWith(color: AppColors.textTertiary)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right,
-                        color: AppColors.textTertiary, size: 20),
-                  ],
-                ),
-                hasArrow: false, // Custom Arrow provided in trailing
-                onTap: () {},
+              Consumer(
+                builder: (context, ref, _) {
+                  final themeMode = ref.watch(themeProvider);
+                  String themeText;
+                  switch (themeMode) {
+                    case ThemeMode.light:
+                      themeText = 'Light';
+                      break;
+                    case ThemeMode.dark:
+                      themeText = 'Dark';
+                      break;
+                    default:
+                      themeText = 'System';
+                  }
+
+                  return SettingsItem(
+                    title: 'Theme',
+                    trailing: Row(
+                      children: [
+                        Text(themeText,
+                            style: AppTextStyles.bodySmall(context)
+                                .copyWith(color: AppColors.textTertiary)),
+                        const SizedBox(width: 8),
+                        Icon(Icons.chevron_right,
+                            color: Theme.of(context).iconTheme.color, size: 20),
+                      ],
+                    ),
+                    hasArrow: false,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ThemeScreen()),
+                    ),
+                  );
+                },
               ),
               SettingsItem(
                 title: 'Currency',

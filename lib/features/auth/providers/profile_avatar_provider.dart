@@ -100,11 +100,14 @@ class ProfileAvatarNotifier extends Notifier<ProfileAvatarState> {
       );
 
       // Update user metadata with avatar URL
+      // We use 'custom_avatar_url' to persist it even if Google Auth provides a 'picture'
       await ref.read(supabaseClientProvider).auth.updateUser(
             UserAttributes(
               data: {
                 ...?user.userMetadata,
-                'avatar_url': publicUrl,
+                'custom_avatar_url': publicUrl,
+                'avatar_url':
+                    publicUrl, // Also update standard field for consistency
               },
             ),
           );

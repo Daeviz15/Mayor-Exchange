@@ -18,10 +18,15 @@ final userTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   return ref.watch(transactionRepositoryProvider).watchUserTransactions(userId);
 });
 
-final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
+final adminTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   // TODO: Verify admin role here or in repository policy?
   // RLS protects the data, but we can also return empty if not admin logic in UI.
   return ref.watch(transactionRepositoryProvider).watchAllTransactions();
+});
+
+final singleTransactionProvider =
+    StreamProvider.family<TransactionModel?, String>((ref, id) {
+  return ref.watch(transactionRepositoryProvider).watchTransaction(id);
 });
 
 class TransactionService {
@@ -33,7 +38,7 @@ class TransactionService {
       this._repository, this._currentUserId, this._supabaseClient);
 
   /// Submit a new Buy/Sell request
-  Future<void> submitTransaction({
+  Future<TransactionModel> submitTransaction({
     required TransactionType type,
     required double amountFiat,
     required String currencyPair,
@@ -68,6 +73,8 @@ class TransactionService {
       note: 'Request submitted',
     );
     // Notify admin? (Optional future enhancement)
+
+    return created;
   }
 
   /// Admin Claims a Request
@@ -102,6 +109,78 @@ class TransactionService {
     // Logic: Move to 'payment_pending' or 'verification_pending' depends on flow.
   }
 
+  /// Admin Accepts Request & Provides Bank Details (Buy Flow)
+  Future<void> adminAcceptRequest({
+    required String transactionId,
+    required String targetUserId,
+    required Map<String, dynamic> bankDetails,
+    required TransactionStatus currentStatus,
+  }) async {
+    if (_currentUserId == null) throw Exception('User not logged in');
+
+    // Fetch current details to merge
+    final tx = await _supabaseClient
+        .from('transactions')
+        .select('details')
+        .eq('id', transactionId)
+        .single();
+    final currentDetails = Map<String, dynamic>.from(tx['details']);
+    final newDetails = {...currentDetails, 'admin_bank_details': bankDetails};
+
+    // Update Transaction
+    await _supabaseClient.from('transactions').update({
+      'status': TransactionStatus.paymentPending.value,
+      'details': newDetails,
+      'admin_id': _currentUserId,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', transactionId);
+
+    // Create Log
+    await _repository.createLog(
+      transactionId: transactionId,
+      actorId: _currentUserId!,
+      newStatus: TransactionStatus.paymentPending,
+      previousStatus: currentStatus,
+      note: 'Admin accepted request and provided account details',
+    );
+
+    // Notify User
+    await _createNotification(
+      userId: targetUserId,
+      title: 'Order Accepted',
+      message:
+          'Your order has been accepted! Please check the app to view payment details.',
+      type: 'transaction',
+      relatedId: transactionId,
+    );
+  }
+
+  /// User Submits Proof of Payment (Buy Flow)
+  Future<void> userSubmitProof({
+    required String transactionId,
+    required String proofPath,
+  }) async {
+    if (_currentUserId == null) throw Exception('User not logged in');
+
+    // Update Transaction
+    await _repository.updateStatus(
+      transactionId: transactionId,
+      newStatus: TransactionStatus.verificationPending,
+      proofPath: proofPath,
+    );
+
+    // Create Log
+    await _repository.createLog(
+      transactionId: transactionId,
+      actorId: _currentUserId!,
+      newStatus: TransactionStatus.verificationPending,
+      previousStatus: TransactionStatus.paymentPending,
+      note: 'User submitted proof of payment',
+    );
+
+    // Note: In a real app we'd notify the specific admin or all admins here
+  }
+
   // Generic status update
   Future<void> updateStatus({
     required String transactionId,
@@ -110,6 +189,8 @@ class TransactionService {
     required TransactionStatus previousStatus,
     String? note,
     String? proofPath,
+    String? notificationMessage, // Custom override
+    Map<String, dynamic>? details,
   }) async {
     if (_currentUserId == null) throw Exception('User not logged in');
 
@@ -117,6 +198,7 @@ class TransactionService {
       transactionId: transactionId,
       newStatus: newStatus,
       proofPath: proofPath,
+      details: details,
     );
 
     await _repository.createLog(
@@ -128,14 +210,17 @@ class TransactionService {
     );
 
     // Notify User
-    String message =
+    String message = notificationMessage ??
         'Your transaction status has been updated to ${newStatus.name.replaceAll('_', ' ')}.';
-    if (newStatus == TransactionStatus.paymentPending) {
-      message = 'Payment has been sent. Please verify.';
-    } else if (newStatus == TransactionStatus.completed) {
-      message = 'Transaction completed! Thank you for trading.';
-    } else if (newStatus == TransactionStatus.rejected) {
-      message = 'Transaction rejected. ${note ?? ""}';
+
+    if (notificationMessage == null) {
+      if (newStatus == TransactionStatus.paymentPending) {
+        message = 'Payment has been sent. Please verify.';
+      } else if (newStatus == TransactionStatus.completed) {
+        message = 'Transaction completed! Thank you for trading.';
+      } else if (newStatus == TransactionStatus.rejected) {
+        message = 'Transaction rejected. ${note ?? ""}';
+      }
     }
 
     await _createNotification(

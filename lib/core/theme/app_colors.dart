@@ -15,6 +15,10 @@ class AppColors {
   static const Color backgroundCardLight = Color(0xFF332A20);
   static const Color backgroundElevated = Color(0xFF3A2F25);
 
+  // Light Theme Colors
+  static const Color backgroundLight = Color(0xFFF8F9FA); // Light Grey/White
+  static const Color textPrimaryLight = Color(0xFF1A1A1A); // Almost Black
+
   // Text Colors
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB8B8B8);

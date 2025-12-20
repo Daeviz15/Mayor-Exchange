@@ -9,12 +9,6 @@ import '../../transactions/models/transaction.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/currency_selector.dart';
-import '../../dasboard/widgets/bottom_nav_bar.dart';
-
-import '../../dasboard/screens/settings_screen.dart';
-import '../../portfolio/screens/portfolio_screen.dart';
-import '../../transactions/screens/buy_sell_crypto_screen.dart';
-import '../../../core/widgets/animations/page_transitions.dart';
 
 /// Gift Cards Screen
 /// Main screen for browsing and searching gift cards
@@ -29,7 +23,7 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = GiftCardCategory.all;
   String _selectedCurrency = 'USD';
-  int _currentNavIndex = 3; // Gift Cards tab index
+
   List<GiftCard> _allGiftCards = [];
   List<GiftCard> _filteredGiftCards = [];
 
@@ -192,41 +186,7 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
         ),
       ),
 
-      // Bottom Navigation
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-
-          // Handle navigation
-          if (index == 0) {
-            // Home tab - pop back to home (root)
-            Navigator.pop(context);
-          } else if (index == 1) {
-            // Portfolio Tab
-            Navigator.pushReplacement(
-              context,
-              SlidePageRoute(page: const PortfolioScreen()),
-            );
-          } else if (index == 2) {
-            // Trade Tab
-            Navigator.pushReplacement(
-              context,
-              SlidePageRoute(page: const BuySellCryptoScreen()),
-            );
-          } else if (index == 3) {
-            // Gift Cards tab - already here
-          } else if (index == 4) {
-            // Settings tab
-            Navigator.pushReplacement(
-              context,
-              SlidePageRoute(page: const SettingsScreen()),
-            );
-          }
-        },
-      ),
+      // Bottom Navigation Removed (Handled by DashboardTab/IndexedStack)
     );
   }
 
@@ -303,6 +263,7 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
                         initialType: TransactionType
                             .sellGiftCard, // Default to Sell as per typical flow, or let them choose tab
                         initialCard: giftCard.name,
+                        selectedCurrency: _selectedCurrency, // New
                       ),
                     ),
                   );

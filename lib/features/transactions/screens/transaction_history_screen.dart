@@ -7,6 +7,8 @@ import '../providers/transaction_service.dart';
 
 import '../../../core/widgets/rocket_loader.dart';
 
+import 'buyer_transaction_status_screen.dart'; // Added import
+
 class TransactionHistoryScreen extends ConsumerWidget {
   const TransactionHistoryScreen({super.key});
 
@@ -18,6 +20,12 @@ class TransactionHistoryScreen extends ConsumerWidget {
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundCard,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip:
+              null, // Disable tooltip to prevent RenderBox layout error during transition
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text('History', style: AppTextStyles.titleLarge(context)),
       ),
       body: RefreshIndicator(
@@ -66,7 +74,25 @@ class TransactionHistoryScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final transaction = transactions[index];
-                return _HistoryCard(transaction: transaction);
+                return GestureDetector(
+                  onTap: () {
+                    // Navigate to detail screen for Buy transactions
+                    // This allows viewing status (Pending/Payment) AND completed details (Gift Card Code)
+                    if (transaction.type == TransactionType.buyGiftCard ||
+                        transaction.type == TransactionType.buyCrypto) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BuyerTransactionStatusScreen(
+                            transactionId: transaction.id,
+                            initialTransaction: transaction,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: _HistoryCard(transaction: transaction),
+                );
               },
             );
           },
@@ -84,7 +110,8 @@ class _HistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBuy = transaction.type == TransactionType.buyCrypto ||
-        transaction.type == TransactionType.buyGiftCard;
+        transaction.type == TransactionType.buyGiftCard ||
+        transaction.type == TransactionType.deposit;
 
     return Card(
       color: AppColors.backgroundCard,
@@ -135,7 +162,7 @@ class _HistoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${isBuy ? '+' : '-'} ₦${transaction.amountFiat}',
+                  '${isBuy ? '+' : '-'}${transaction.details['currency_symbol'] ?? '₦'}${transaction.amountFiat}',
                   style: AppTextStyles.bodyMedium(context)
                       .copyWith(fontWeight: FontWeight.bold),
                 ),
@@ -165,6 +192,10 @@ class _HistoryCard extends StatelessWidget {
         return 'Buy Gift Card';
       case TransactionType.sellGiftCard:
         return 'Sell Gift Card';
+      case TransactionType.deposit:
+        return 'Deposit';
+      case TransactionType.withdrawal:
+        return 'Withdrawal';
     }
   }
 

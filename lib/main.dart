@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mayor_exchange/core/constants/supabase_constants.dart';
 import 'package:mayor_exchange/core/theme/app_theme.dart';
+import 'package:mayor_exchange/core/theme/theme_provider.dart';
 import 'package:mayor_exchange/features/onboarding/screens/splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/widgets/offline_overlay.dart';
@@ -28,13 +29,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mayor Exchange',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const SplashScreen(),
-      builder: (context, child) {
-        return OfflineOverlay(child: child!);
+    return Consumer(
+      builder: (context, ref, child) {
+        final themeMode = ref.watch(themeProvider);
+
+        return MaterialApp(
+          title: 'Mayor Exchange',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          home: const SplashScreen(),
+          builder: (context, child) {
+            return OfflineOverlay(child: child!);
+          },
+        );
       },
     );
   }

@@ -92,31 +92,42 @@ class _SplashScreenState extends State<SplashScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 150,
-                      height: 150,
+                      width: 140,
+                      height: 140,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                        // Removed BoxShape.circle to prevent cutting off square logos
+                        shape: BoxShape.rectangle,
+                        image: const DecorationImage(
+                          image: AssetImage('assets/images/logo.png'),
+                          fit: BoxFit.contain,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryOrange.withOpacity(0.2),
-                            blurRadius: 30,
-                            spreadRadius: 5,
+                            color:
+                                AppColors.primaryOrange.withValues(alpha: 0.25),
+                            blurRadius: 60,
+                            spreadRadius: 10,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.contain,
-                      ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     Text(
                       'MAYOR EXCHANGE',
                       style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
+                        fontFamily: 'Outfit', // Ensure premium font
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 2.0,
+                        shadows: [
+                          Shadow(
+                            color:
+                                AppColors.primaryOrange.withValues(alpha: 0.5),
+                            blurRadius: 10,
+                          ),
+                        ],
                       ),
                     ),
                   ],

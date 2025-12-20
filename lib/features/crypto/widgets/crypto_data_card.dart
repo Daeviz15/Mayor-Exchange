@@ -32,13 +32,14 @@ class CryptoDataCard extends StatelessWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.backgroundCard,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
               Icon(
@@ -46,13 +47,13 @@ class CryptoDataCard extends StatelessWidget {
                 color: AppColors.textTertiary,
                 size: 20,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
             ],
             Text(
               label,
               style: AppTextStyles.bodySmall(context),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               value,
               style: AppTextStyles.titleSmall(context).copyWith(
@@ -65,4 +66,3 @@ class CryptoDataCard extends StatelessWidget {
     );
   }
 }
-

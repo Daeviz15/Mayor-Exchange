@@ -44,6 +44,18 @@ class TransactionRepository {
             data.map((json) => TransactionModel.fromJson(json)).toList());
   }
 
+  /// Watch a SINGLE transaction by ID
+  Stream<TransactionModel?> watchTransaction(String transactionId) {
+    return _client
+        .from('transactions')
+        .stream(primaryKey: ['id'])
+        .eq('id', transactionId)
+        .map((data) {
+          if (data.isEmpty) return null;
+          return TransactionModel.fromJson(data.first);
+        });
+  }
+
   /// Watch ALL transactions (for Admin)
   Stream<List<TransactionModel>> watchAllTransactions() {
     return _client
@@ -97,6 +109,7 @@ class TransactionRepository {
     required TransactionStatus newStatus,
     String? adminId, // Optional update of admin
     String? proofPath,
+    Map<String, dynamic>? details,
   }) async {
     final updates = <String, dynamic>{
       'status': newStatus.value,
@@ -105,6 +118,7 @@ class TransactionRepository {
 
     if (adminId != null) updates['admin_id'] = adminId;
     if (proofPath != null) updates['proof_image_path'] = proofPath;
+    if (details != null) updates['details'] = details;
 
     await _client.from('transactions').update(updates).eq('id', transactionId);
   }

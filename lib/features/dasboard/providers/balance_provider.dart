@@ -1,4 +1,6 @@
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../portfolio/providers/portfolio_provider.dart';
+import '../../crypto/providers/crypto_providers.dart';
 
 /// User Balance State
 class BalanceState {
@@ -19,20 +21,43 @@ class BalanceState {
 }
 
 /// Balance Provider
-final balanceProvider = StateNotifierProvider<BalanceNotifier, BalanceState>((
-  ref,
-) {
-  return BalanceNotifier();
+/// Now derives authentic data from PortfolioProvider
+final balanceProvider = Provider<BalanceState>((ref) {
+  final portfolioState = ref.watch(portfolioProvider);
+
+  // 1. Total Balance is direct from portfolio
+  final totalBalance = portfolioState.totalValue;
+
+  // 2. Calculate Weighted 24h Change
+  // Formula: Sum(AssetValue * AssetChange%) / TotalValue
+  double weightedChangeSum = 0.0;
+  final cryptoList = ref.watch(cryptoListProvider).value ?? [];
+
+  for (final item in portfolioState.items) {
+    if (item.isFiat) {
+      // Fiat (NGN) has 0% change relative to itself in this context
+      // weightedChangeSum += item.valueInNaira * 0.0;
+      continue;
+    }
+
+    // Find 24h change for this crypto asset
+    double changePercent = 0.0;
+    final cryptoData = cryptoList
+        .where((c) => c.symbol.toUpperCase() == item.symbol.toUpperCase())
+        .firstOrNull;
+
+    if (cryptoData != null) {
+      changePercent = cryptoData.changePercent;
+    }
+
+    weightedChangeSum += (item.valueInNaira * changePercent);
+  }
+
+  final weightedChangePercent =
+      totalBalance == 0 ? 0.0 : (weightedChangeSum / totalBalance);
+
+  return BalanceState(
+    totalBalance: totalBalance,
+    changePercent24h: weightedChangePercent,
+  );
 });
-
-class BalanceNotifier extends StateNotifier<BalanceState> {
-  BalanceNotifier() : super(const BalanceState());
-
-  void updateBalance(double newBalance) {
-    state = state.copyWith(totalBalance: newBalance);
-  }
-
-  void updateChangePercent(double newPercent) {
-    state = state.copyWith(changePercent24h: newPercent);
-  }
-}

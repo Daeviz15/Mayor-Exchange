@@ -113,7 +113,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       controller: _emailController,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        hintText: 'Placeholder Here',
+                        hintText: 'example@gmail.com',
                         hintStyle: TextStyle(color: AppColors.textTertiary),
                         filled: true,
                         fillColor: AppColors.backgroundCard,
