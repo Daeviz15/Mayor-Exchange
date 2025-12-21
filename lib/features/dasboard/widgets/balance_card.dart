@@ -8,12 +8,14 @@ import '../../../core/theme/app_text_styles.dart';
 class BalanceCard extends StatefulWidget {
   final double balance;
   final double changePercent;
+  final String symbol;
   final VoidCallback? onViewPortfolio;
 
   const BalanceCard({
     super.key,
     required this.balance,
     required this.changePercent,
+    this.symbol = '₦',
     this.onViewPortfolio,
   });
 
@@ -125,13 +127,13 @@ class _BalanceCardState extends State<BalanceCard>
                 curve: Curves.easeOutCubic,
                 builder: (context, animatedValue, child) {
                   return Text(
-                    '₦${animatedValue.toStringAsFixed(2)}',
+                    '${widget.symbol}${animatedValue.toStringAsFixed(2)}',
                     style: AppTextStyles.balanceAmount(context),
                   );
                 },
               ),
               secondChild: Text(
-                '₦ ****.**',
+                '${widget.symbol} ****.**',
                 style: AppTextStyles.balanceAmount(context),
               ),
               crossFadeState: _isBalanceVisible

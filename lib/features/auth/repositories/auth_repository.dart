@@ -207,12 +207,16 @@ class AuthRepository {
     String? phoneNumber,
     String? address,
     DateTime? dateOfBirth,
+    String? country,
+    String? currency,
   }) async {
     try {
       final updates = <String, dynamic>{};
       if (fullName != null) updates['full_name'] = fullName;
       if (phoneNumber != null) updates['phone_number'] = phoneNumber;
       if (address != null) updates['address'] = address;
+      if (country != null) updates['country'] = country;
+      if (currency != null) updates['currency'] = currency;
       if (dateOfBirth != null) {
         updates['date_of_birth'] = dateOfBirth.toIso8601String();
       }
@@ -234,6 +238,8 @@ class AuthRepository {
             ? DateTime.tryParse(user.userMetadata!['date_of_birth'] as String)
             : null,
         address: user.userMetadata?['address'] as String?,
+        country: user.userMetadata?['country'] as String?,
+        currency: user.userMetadata?['currency'] as String?,
         createdAt: DateTime.parse(user.createdAt),
       );
     } on AuthException catch (e) {

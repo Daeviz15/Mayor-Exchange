@@ -22,12 +22,22 @@ import '../../auth/providers/profile_avatar_provider.dart';
 import '../../../core/widgets/animations/fade_in_slide.dart';
 import '../../../core/widgets/animations/page_transitions.dart';
 import '../../portfolio/screens/portfolio_screen.dart';
+import '../widgets/country_selection_modal.dart';
+import '../../transactions/services/forex_service.dart';
+import '../../../core/providers/navigation_provider.dart';
 
-class DashboardTab extends ConsumerWidget {
+class DashboardTab extends ConsumerStatefulWidget {
   const DashboardTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends ConsumerState<DashboardTab> {
+  bool _hasCheckedCountry = false;
+
+  @override
+  Widget build(BuildContext context) {
     final balanceState = ref.watch(balanceProvider);
     final cryptoListAsync = ref.watch(cryptoListProvider);
     final authState = ref.watch(authControllerProvider);
@@ -40,6 +50,26 @@ class DashboardTab extends ConsumerWidget {
     final email = user?.email ?? '';
     final localAvatarPath = avatarState.localPath;
     final networkAvatarUrl = avatarState.storageUrl ?? user?.avatarUrl;
+
+    // Check if country is set, if not show modal
+    // Only check once per session or if user specifically is loaded but has no country
+    if (user != null && user.country == null && !_hasCheckedCountry) {
+      _hasCheckedCountry = true; // Mark as checked to prevent loop
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showModalBottomSheet(
+          context: context,
+          isDismissible: false,
+          enableDrag: false,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const CountrySelectionModal(),
+        ).then((_) {
+          // Reset check if modal is dismissed without selection significantly?
+          // Or leave it true to avoid pestering until next restart.
+          // If user selected, user.country won't be null, so it won't trigger anyway.
+        });
+      });
+    }
 
     // Listen for new notifications to show overlay
     ref.listen(notificationsProvider, (previous, next) {
@@ -98,21 +128,48 @@ class DashboardTab extends ConsumerWidget {
                   FadeInSlide(
                     duration: const Duration(milliseconds: 800),
                     delay: const Duration(milliseconds: 100),
-                    child: BalanceCard(
-                      balance: balanceState.totalBalance,
-                      changePercent: balanceState.changePercent24h,
-                      onViewPortfolio: () {
-                        // Note: This pushes a new Portfolio Screen on top
-                        // If user wants to switch tab instead, we would need to access navigationProvider
-                        // For now, keeping as push for specific "View Portfolio" action,
-                        // or we can switch tab. Let's switch tab for consistency if requested.
-                        // But for now, let's keep push to avoid circular dependency or complex callback passing.
-                        Navigator.push(
-                          context,
-                          SlidePageRoute(page: const PortfolioScreen()),
-                        );
-                      },
-                    ),
+                    child: Builder(builder: (context) {
+                      final currency = user?.currency ?? 'NGN';
+                      String symbol = '₦';
+
+                      // Use ForexService for conversion
+                      final forexService = ref.read(forexServiceProvider);
+                      final forexRate = forexService.convert(
+                          balanceState.totalBalance, currency);
+
+                      // Determine symbol
+                      switch (currency) {
+                        case 'USD':
+                          symbol = '\$';
+                          break;
+                        case 'GBP':
+                          symbol = '£';
+                          break;
+                        case 'EUR':
+                          symbol = '€';
+                          break;
+                        case 'CAD':
+                          symbol = 'C\$';
+                          break;
+                        case 'GHS':
+                          symbol = '₵';
+                          break;
+                        default:
+                          symbol = '₦';
+                      }
+
+                      return BalanceCard(
+                        balance: forexRate,
+                        changePercent: balanceState.changePercent24h,
+                        symbol: symbol,
+                        onViewPortfolio: () {
+                          Navigator.push(
+                            context,
+                            SlidePageRoute(page: const PortfolioScreen()),
+                          );
+                        },
+                      );
+                    }),
                   ),
 
                   const SizedBox(height: 24),
@@ -129,11 +186,8 @@ class DashboardTab extends ConsumerWidget {
                             icon: Icons.swap_horiz,
                             isPrimary: true,
                             onTap: () {
-                              // Navigate to trade tab? Or distinct screen?
-                              // Usually Trade Tab index 2
-                              // We can' easily switch tab here without ref access to nav provider
-                              // inside a purely stateless composition unless we pass it.
-                              // For now, let's leave as placeholder or push screen.
+                              // Switch to Buy/Sell Crypto Tab (Index 2)
+                              ref.read(navigationProvider.notifier).setIndex(2);
                             },
                           ),
                         ),

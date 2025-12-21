@@ -4,12 +4,14 @@ import '../../../core/theme/app_colors.dart';
 class PortfolioSummaryCard extends StatefulWidget {
   final double totalBalance;
   final bool isVisible;
+  final String symbol; // New
   final VoidCallback onToggleVisibility;
 
   const PortfolioSummaryCard({
     super.key,
     required this.totalBalance,
     required this.isVisible,
+    this.symbol = '₦', // Default
     required this.onToggleVisibility,
   });
 
@@ -158,7 +160,7 @@ class _PortfolioSummaryCardState extends State<PortfolioSummaryCard>
                   },
                   child: widget.isVisible
                       ? Text(
-                          '₦${widget.totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                          '${widget.symbol}${widget.totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                           key: ValueKey(widget.totalBalance),
                           style: const TextStyle(
                             color: Colors.white,
@@ -167,10 +169,10 @@ class _PortfolioSummaryCardState extends State<PortfolioSummaryCard>
                             letterSpacing: -0.5,
                           ),
                         )
-                      : const Text(
-                          '₦ ••••••',
-                          key: ValueKey('hidden'),
-                          style: TextStyle(
+                      : Text(
+                          '${widget.symbol} ••••••',
+                          key: const ValueKey('hidden'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 32,
                             fontWeight: FontWeight.bold,

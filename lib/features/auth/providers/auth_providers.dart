@@ -172,6 +172,8 @@ class AuthController extends AsyncNotifier<AppUser?> {
       phoneNumber: phoneNumber,
       address: address,
       dateOfBirth: dateOfBirth,
+      country: metadata['country'] as String?,
+      currency: metadata['currency'] as String?,
       createdAt: DateTime.parse(user.createdAt),
     );
   }
@@ -181,6 +183,8 @@ class AuthController extends AsyncNotifier<AppUser?> {
     String? phoneNumber,
     String? address,
     DateTime? dateOfBirth,
+    String? country,
+    String? currency,
   }) async {
     state = const AsyncLoading();
     try {
@@ -190,6 +194,8 @@ class AuthController extends AsyncNotifier<AppUser?> {
         phoneNumber: phoneNumber,
         address: address,
         dateOfBirth: dateOfBirth,
+        country: country,
+        currency: currency,
       );
       state = AsyncData(updatedUser);
     } catch (e, stackTrace) {

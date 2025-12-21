@@ -6,6 +6,8 @@ import '../providers/portfolio_provider.dart';
 import '../widgets/asset_allocation_chart.dart';
 import '../widgets/asset_list.dart';
 import '../widgets/portfolio_summary_card.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../transactions/services/forex_service.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
   const PortfolioScreen({super.key});
@@ -24,6 +26,37 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     // the user sees the charts populated as they requested "make it excellent".
     // Switches to portfolioProvider later.
     final portfolioState = ref.watch(portfolioProvider);
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.asData?.value;
+
+    final currency = user?.currency ?? 'NGN';
+    // Use ForexService for conversion
+    final forexService = ref.read(forexServiceProvider);
+    final convertedBalance =
+        forexService.convert(portfolioState.totalValue, currency);
+
+    String symbol = '₦';
+
+    // Determine symbol
+    switch (currency) {
+      case 'USD':
+        symbol = '\$';
+        break;
+      case 'GBP':
+        symbol = '£';
+        break;
+      case 'EUR':
+        symbol = '€';
+        break;
+      case 'CAD':
+        symbol = 'C\$';
+        break;
+      case 'GHS':
+        symbol = '₵';
+        break;
+      default:
+        symbol = '₦';
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -45,7 +78,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
             FadeInSlide(
               duration: const Duration(milliseconds: 600),
               child: PortfolioSummaryCard(
-                totalBalance: portfolioState.totalValue,
+                totalBalance: convertedBalance,
+                symbol: symbol,
                 isVisible: _isBalanceVisible,
                 onToggleVisibility: () {
                   setState(() {

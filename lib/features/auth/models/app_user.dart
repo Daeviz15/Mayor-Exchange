@@ -6,6 +6,8 @@ class AppUser {
   final String? phoneNumber;
   final DateTime? dateOfBirth;
   final String? address;
+  final String? country;
+  final String? currency;
   final DateTime createdAt;
 
   AppUser({
@@ -16,6 +18,8 @@ class AppUser {
     this.phoneNumber,
     this.dateOfBirth,
     this.address,
+    this.country,
+    this.currency,
     required this.createdAt,
   });
 
@@ -36,6 +40,8 @@ class AppUser {
           ? DateTime.parse(json['date_of_birth'] as String)
           : null,
       address: json['address'] as String?,
+      country: json['country'] as String?,
+      currency: json['currency'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -49,6 +55,8 @@ class AppUser {
       'phone_number': phoneNumber,
       'date_of_birth': dateOfBirth?.toIso8601String(),
       'address': address,
+      'country': country,
+      'currency': currency,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -61,6 +69,8 @@ class AppUser {
     String? phoneNumber,
     DateTime? dateOfBirth,
     String? address,
+    String? country,
+    String? currency,
     DateTime? createdAt,
   }) {
     return AppUser(
@@ -71,6 +81,8 @@ class AppUser {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       address: address ?? this.address,
+      country: country ?? this.country,
+      currency: currency ?? this.currency,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -36,9 +36,8 @@ class QuickActionButton extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
           decoration: BoxDecoration(
-            color: isPrimary
-                ? AppColors.primaryOrange
-                : AppColors.backgroundCard,
+            color:
+                isPrimary ? AppColors.primaryOrange : AppColors.backgroundCard,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -54,7 +53,8 @@ class QuickActionButton extends StatelessWidget {
                     context,
                   ).copyWith(fontWeight: FontWeight.w700, fontSize: 14),
                   overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],

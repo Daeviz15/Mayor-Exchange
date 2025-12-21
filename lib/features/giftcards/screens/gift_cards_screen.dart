@@ -85,9 +85,33 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Giftcards',
-                    style: AppTextStyles.headlineMedium(context),
+                  Row(
+                    children: [
+                      if (Navigator.canPop(context))
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundCard,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Text(
+                        'Giftcards',
+                        style: AppTextStyles.headlineMedium(context),
+                      ),
+                    ],
                   ),
                   CurrencySelector(
                     selectedCurrency: _selectedCurrency,

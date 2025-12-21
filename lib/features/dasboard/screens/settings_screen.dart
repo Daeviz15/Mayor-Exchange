@@ -12,6 +12,7 @@ import '../../auth/screens/login_screen.dart';
 import '../../auth/screens/two_factor_screen.dart';
 import '../widgets/settings_item.dart';
 import '../widgets/profile_settings_header.dart';
+import '../widgets/country_selection_modal.dart';
 import '../../admin/providers/admin_role_provider.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import 'personal_details_screen.dart';
@@ -322,20 +323,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                 },
               ),
-              SettingsItem(
-                title: 'Currency',
-                trailing: Row(
-                  children: [
-                    Text('USD',
-                        style: AppTextStyles.bodySmall(context)
-                            .copyWith(color: AppColors.textTertiary)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right,
-                        color: AppColors.textTertiary, size: 20),
-                  ],
-                ),
-                hasArrow: false,
-                onTap: () {},
+              Consumer(
+                builder: (context, ref, _) {
+                  final authState = ref.watch(authControllerProvider);
+                  final user = authState.asData?.value;
+                  final currency = user?.currency ?? 'NGN';
+
+                  return SettingsItem(
+                    title: 'Currency',
+                    trailing: Row(
+                      children: [
+                        Text(currency,
+                            style: AppTextStyles.bodySmall(context)
+                                .copyWith(color: AppColors.textTertiary)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.chevron_right,
+                            color: AppColors.textTertiary, size: 20),
+                      ],
+                    ),
+                    hasArrow: false,
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isDismissible: true,
+                        enableDrag: true,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const CountrySelectionModal(),
+                      );
+                    },
+                  );
+                },
               ),
 
               const SizedBox(height: 32),
