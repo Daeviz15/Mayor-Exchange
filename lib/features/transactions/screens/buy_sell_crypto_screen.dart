@@ -173,14 +173,15 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     final amountValid = _amountUSD > 0;
 
     // For Buy: Address is User Wallet. For Sell: Address is User Bank Details.
-    final detailsValid = _addressController.text.isNotEmpty;
 
     if (isBuy) {
-      // Buy requires Proof Image
-      return amountValid && detailsValid && _proofImage != null;
+      // Buy requires Proof Image & Wallet Address
+      return amountValid &&
+          _addressController.text.isNotEmpty &&
+          _proofImage != null;
     } else {
-      // Sell just requires details (and amount)
-      return amountValid && detailsValid;
+      // Sell just requires amount (Bank details are now auto-wallet)
+      return amountValid;
     }
   }
 
@@ -228,12 +229,11 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
           'asset': _selectedAsset,
           'usd_input': _amountUSD,
           'fx_rate_applied': fxRateApplied,
-          'target_address': isBuy
-              ? _addressController.text
-              : 'Admin Deposit Wallet', // For Sell, we show Admin Wallet in UI (mock)
+          'target_address':
+              isBuy ? _addressController.text : 'Admin Deposit Wallet',
           'user_bank_details': isBuy
               ? 'N/A'
-              : _addressController.text, // User gives bank when selling
+              : 'Credited to Fiat Wallet', // Auto-credit to wallet
         },
       );
 
@@ -248,8 +248,19 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
+      // Friendly Error Handling
+      String message = 'An unexpected error occurred. Please try again.';
+      if (e.toString().contains('network')) {
+        message = 'Please check your internet connection.';
+      } else if (e.toString().contains('PostgrestException')) {
+        message = 'We encountered a server error. Support has been notified.';
+        debugPrint('Supabase Error: $e'); // Log real error for dev
+      } else {
+        message = e.toString().replaceAll('Exception: ', '');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -578,22 +589,43 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                   const SizedBox(height: 24),
 
                   // User Bank Details Input
-                  Text('Receive Cash At:',
-                      style: AppTextStyles.labelMedium(context)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _addressController,
-                    maxLines: 3,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                        hintText: 'Bank Name:\nAccount Number:\nAccount Name:',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: AppColors.backgroundCard,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none)),
+                  // Wallet Credit Info
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.primaryOrange.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet,
+                                color: AppColors.primaryOrange, size: 20),
+                            SizedBox(width: 8),
+                            Text('Funds Destination',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Funds will be credited to your Fiat Wallet',
+                          style: AppTextStyles.titleMedium(context)
+                              .copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Once approved, the balance will be instantly available for withdrawal.',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
 

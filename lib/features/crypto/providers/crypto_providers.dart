@@ -1,71 +1,122 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+
 import 'dart:math';
+import 'dart:convert';
 import '../models/crypto_details.dart';
 import '../services/coingecko_service.dart';
 import '../../dasboard/models/crypto_data.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/shared_preferences_provider.dart';
 
 /// Crypto List Provider
-/// Provides real-time list of cryptocurrencies for dashboard
-final cryptoListProvider = FutureProvider<List<CryptoData>>((ref) async {
-  try {
-    debugPrint('🔍 CryptoListProvider: Fetching crypto market data...');
-    final marketData = await CoinGeckoService.getMarketData();
-    debugPrint(
-      '✅ CryptoListProvider: Received ${marketData.length} coins from API',
-    );
+/// Provides real-time list of cryptocurrencies for dashboard with caching
+final cryptoListProvider =
+    AsyncNotifierProvider<CryptoListNotifier, List<CryptoData>>(() {
+  return CryptoListNotifier();
+});
 
-    // Generate chart data for each coin (no historical API call needed)
-    final List<CryptoData> cryptoList = [];
+class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
+  @override
+  List<CryptoData> build() {
+    // 1. Load from cache synchronously
+    final cachedData = _loadFromCacheSync();
 
-    for (final data in marketData) {
-      debugPrint(
-        '📊 CryptoListProvider: Generating chart data for ${data.symbol}...',
-      );
+    // 2. Trigger fresh fetch in background (post-frame to avoid build side-effects)
+    Future.microtask(() => _fetchFreshData());
 
-      // Generate 7 price points for mini chart based on current price and 24h change
-      final chartPoints = _generateChartData(
-        data.currentPrice,
-        data.priceChangePercent24h,
-      );
+    // 3. Return cached data immediately (or empty list if none)
+    // This sets the initial state to AsyncData(cachedData)
+    return cachedData;
+  }
 
-      debugPrint(
-        '✅ CryptoListProvider: Generated ${chartPoints.length} price points for ${data.symbol}',
-      );
-
-      cryptoList.add(
-        CryptoData(
-          id: data.id,
-          symbol: data.symbol,
-          name: data.name,
-          price: data.currentPrice,
-          changePercent: data.priceChangePercent24h,
-          iconColor: _getIconColor(data.symbol),
-          iconLetter: _getIconLetter(data.symbol),
-          iconUrl: data.imageUrl.isNotEmpty ? data.imageUrl : null,
-          chartData: chartPoints,
-        ),
-      );
+  List<CryptoData> _loadFromCacheSync() {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final jsonString = prefs.getString('cached_crypto_list');
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> jsonList = jsonDecode(jsonString);
+        return jsonList
+            .map((e) => CryptoData.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading cached crypto list: $e');
     }
-
-    debugPrint(
-      '🎉 CryptoListProvider: Successfully loaded ${cryptoList.length} cryptocurrencies',
-    );
-    return cryptoList;
-  } catch (e, stackTrace) {
-    // Log the actual error for debugging
-    debugPrint('❌ CryptoListProvider ERROR: $e');
-    debugPrint('📍 Stack trace: $stackTrace');
-
-    // Return empty list to prevent app crash, but error is now visible in console
-    debugPrint(
-      '⚠️  Returning empty list due to error. Check the error above for details.',
-    );
     return [];
   }
-});
+
+  Future<void> _fetchFreshData({bool forceRefresh = false}) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final lastFetch = prefs.getInt('last_crypto_fetch_time') ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cacheAge = now - lastFetch;
+    const cacheDuration = 5 * 60 * 1000; // 5 minutes
+
+    // If cache is fresh (< 5 mins) and we have data, skip fetch unless forced
+    if (!forceRefresh &&
+        cacheAge < cacheDuration &&
+        (state.asData?.value.isNotEmpty ?? false)) {
+      debugPrint(
+          '⚡ CryptoListProvider: Cache is fresh (${(cacheAge / 1000).round()}s). Skipping API.');
+      return;
+    }
+
+    if (state.asData?.value.isEmpty ?? true) {
+      state = const AsyncLoading();
+    }
+
+    try {
+      debugPrint('🔍 CryptoListProvider: Fetching fresh crypto market data...');
+      final marketData = await CoinGeckoService.getMarketData();
+
+      final List<CryptoData> cryptoList = [];
+
+      for (final data in marketData) {
+        final chartPoints = _generateChartData(
+          data.currentPrice,
+          data.priceChangePercent24h,
+        );
+
+        cryptoList.add(
+          CryptoData(
+            id: data.id,
+            symbol: data.symbol,
+            name: data.name,
+            price: data.currentPrice,
+            changePercent: data.priceChangePercent24h,
+            iconColor: _getIconColor(data.symbol),
+            iconLetter: _getIconLetter(data.symbol),
+            iconUrl: data.imageUrl.isNotEmpty ? data.imageUrl : null,
+            chartData: chartPoints,
+          ),
+        );
+      }
+
+      // Update Cache
+      final jsonString = jsonEncode(cryptoList.map((e) => e.toJson()).toList());
+      await prefs.setString('cached_crypto_list', jsonString);
+      await prefs.setInt('last_crypto_fetch_time', now);
+
+      // Update State
+      state = AsyncData(cryptoList);
+    } catch (e, stack) {
+      debugPrint('❌ CryptoListProvider ERROR: $e');
+      // If we have cached data, we keep it but maybe show a snackbar (UI responsibility)
+      // or we set state to Error only if we have no data?
+      if (state.asData?.value.isEmpty ?? true) {
+        state = AsyncError(e, stack);
+      }
+      // If we have data, we silently fail the refresh (or could use a side-channel for errors)
+    }
+  }
+
+  /// Manually trigger a refresh (e.g. Pull-to-Refresh)
+  Future<void> refresh() async {
+    await _fetchFreshData(forceRefresh: true);
+  }
+}
 
 /// Generate realistic chart data based on current price and 24h change
 List<double> _generateChartData(double currentPrice, double changePercent24h) {

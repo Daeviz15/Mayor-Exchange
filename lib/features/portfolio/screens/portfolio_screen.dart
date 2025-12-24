@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/animations/fade_in_slide.dart';
 import '../providers/portfolio_provider.dart';
-import '../widgets/asset_allocation_chart.dart';
-import '../widgets/asset_list.dart';
 import '../widgets/portfolio_summary_card.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../transactions/services/forex_service.dart';
+import '../../wallet/screens/withdrawal_screen.dart';
+import '../../dasboard/widgets/transaction_short_list.dart';
 
 class PortfolioScreen extends ConsumerStatefulWidget {
   const PortfolioScreen({super.key});
@@ -21,10 +22,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Use mock provider for demonstration of "sleek UI" if real data is empty
-    // But ideally we use portfolioProvider. Let's use mockPortfolioProvider to ensure
-    // the user sees the charts populated as they requested "make it excellent".
-    // Switches to portfolioProvider later.
     final portfolioState = ref.watch(portfolioProvider);
     final authState = ref.watch(authControllerProvider);
     final user = authState.asData?.value;
@@ -73,6 +70,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Net Worth Card
             FadeInSlide(
@@ -89,29 +87,91 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // Allocation Chart
+            // Wallet Actions (Withdraw Only)
             FadeInSlide(
               duration: const Duration(milliseconds: 600),
               delay: const Duration(milliseconds: 200),
-              child: AssetAllocationChart(
-                fiatPercentage: portfolioState.fiatPercentage,
-                cryptoPercentage: portfolioState.cryptoPercentage,
+              child: _buildWalletActionButton(
+                context,
+                label: 'Withdraw Funds',
+                icon: Icons.arrow_outward_rounded,
+                color: AppColors
+                    .primaryOrange, // Use primary color for main action
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const WithdrawalScreen()),
+                  );
+                },
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // Asset List
-            FadeInSlide(
-              duration: const Duration(milliseconds: 600),
-              delay: const Duration(milliseconds: 400),
-              direction: SlideDirection.right,
-              child: AssetList(items: portfolioState.items),
+            // text "Recent Activity" is removed here because TransactionShortList likely has its own or we rely on the list's header.
+            // Actually, TransactionShortList has "Recent Transactions" and "View all".
+            // So we don't need a text header here.
+
+            // Transaction List
+            const FadeInSlide(
+              duration: Duration(milliseconds: 600),
+              delay: Duration(milliseconds: 400),
+              child: TransactionShortList(),
             ),
 
             const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletActionButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20), // More height
+        decoration: BoxDecoration(
+          color: AppColors.backgroundCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          // Changed to Row for expanded button look
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: AppTextStyles.titleMedium(context).copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

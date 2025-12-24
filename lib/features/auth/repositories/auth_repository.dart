@@ -42,6 +42,8 @@ class AuthRepository {
           'password': password,
           'data': {
             'full_name': fullName.trim(),
+            'country': 'Nigeria',
+            'currency': 'NGN',
           },
         },
       );
@@ -60,6 +62,8 @@ class AuthRepository {
         email: userData['email'] ?? email.trim(),
         fullName: fullName.trim(), // We know the name we sent
         avatarUrl: userData['user_metadata']?['avatar_url'],
+        country: userData['user_metadata']?['country'] ?? 'Nigeria',
+        currency: userData['user_metadata']?['currency'] ?? 'NGN',
         createdAt: DateTime.now(), // Approximate
       );
     } on FunctionException catch (e) {

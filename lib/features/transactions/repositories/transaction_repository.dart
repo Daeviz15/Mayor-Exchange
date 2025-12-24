@@ -17,7 +17,8 @@ class TransactionRepository {
       TransactionModel transaction) async {
     final response = await _client
         .from('transactions')
-        .insert(transaction.toJson())
+        .insert(transaction.toJson()
+          ..removeWhere((key, value) => key == 'id' && value == ''))
         .select()
         .single();
 

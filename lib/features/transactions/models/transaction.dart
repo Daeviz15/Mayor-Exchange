@@ -88,6 +88,7 @@ class TransactionModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'user_id': userId,
       'admin_id': adminId,
       'type': type.value,
@@ -97,6 +98,8 @@ class TransactionModel {
       'currency_pair': currencyPair,
       'details': details,
       'proof_image_path': proofImagePath,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 

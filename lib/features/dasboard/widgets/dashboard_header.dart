@@ -108,48 +108,50 @@ class DashboardHeader extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.avatarBackground,
-                      shape: BoxShape.circle,
-                      image: localAvatarPath != null
-                          ? DecorationImage(
-                              image: FileImage(
-                                File(localAvatarPath!),
-                              ),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: _buildAvatarContent(
-                      localAvatarPath: localAvatarPath,
-                      networkAvatarUrl: networkAvatarUrl,
+            Expanded(
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.avatarBackground,
+                        shape: BoxShape.circle,
+                        image: localAvatarPath != null
+                            ? DecorationImage(
+                                image: FileImage(
+                                  File(localAvatarPath!),
+                                ),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: _buildAvatarContent(
+                        localAvatarPath: localAvatarPath,
+                        networkAvatarUrl: networkAvatarUrl,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName?.isNotEmpty == true ? displayName! : 'User',
-                      style: AppTextStyles.titleLarge(context),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome Back ${displayName?.split(' ').first ?? 'User'}',
+                          style: AppTextStyles.titleMedium(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    if (email != null && email!.isNotEmpty)
-                      Text(
-                        email!,
-                        style: AppTextStyles.bodySmall(context)
-                            .copyWith(color: AppColors.textSecondary),
-                      ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
             NotificationBadge(
               onTap: onNotificationTap ?? () {},

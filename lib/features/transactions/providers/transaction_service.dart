@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/providers/supabase_provider.dart';
+import '../../../core/providers/shared_preferences_provider.dart';
 import '../models/transaction.dart';
 import '../repositories/transaction_repository.dart';
 
@@ -12,11 +15,93 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
   return TransactionService(repository, userId, supabaseClient);
 });
 
-final userTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
-  final userId = ref.watch(authControllerProvider).asData?.value?.id;
-  if (userId == null) return const Stream.empty();
-  return ref.watch(transactionRepositoryProvider).watchUserTransactions(userId);
+final userTransactionsProvider =
+    AsyncNotifierProvider<UserTransactionsNotifier, List<TransactionModel>>(() {
+  return UserTransactionsNotifier();
 });
+
+class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
+  @override
+  List<TransactionModel> build() {
+    final userId = ref.watch(authControllerProvider).asData?.value?.id;
+    if (userId == null) return [];
+
+    // 1. Load from cache synchronously
+    final cached = _loadFromCacheSync();
+
+    // 2. Fetch fresh data background
+    Future.microtask(() {
+      _subscribeToRealtime(userId);
+      _fetchFreshData(userId);
+    });
+
+    return cached;
+  }
+
+  List<TransactionModel> _loadFromCacheSync() {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final jsonString = prefs.getString('cached_transactions');
+
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> jsonList = jsonDecode(jsonString);
+        return jsonList
+            .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading cached transactions: $e');
+    }
+    return [];
+  }
+
+  Future<void> _fetchFreshData(String userId) async {
+    // Only set loading if we have no cache?
+    // Or just let it update silently.
+    // For transactions, silent update is usually better if we have cache.
+    // If empty cache, maybe loading?
+    if (state.asData?.value.isEmpty ?? true) {
+      state = const AsyncLoading();
+    }
+
+    try {
+      // Get the stream and take the first value as "fresh" data
+      final transactions = await ref
+          .read(transactionRepositoryProvider)
+          .watchUserTransactions(userId)
+          .first;
+
+      // Cache it
+      final prefs = ref.read(sharedPreferencesProvider);
+      final jsonString =
+          jsonEncode(transactions.map((e) => e.toJson()).toList());
+      await prefs.setString('cached_transactions', jsonString);
+
+      state = AsyncData(transactions);
+    } catch (e, stack) {
+      debugPrint('Error fetching fresh transactions: $e');
+      if (state.asData?.value.isEmpty ?? true) {
+        state = AsyncError(e, stack);
+      }
+    }
+  }
+
+  void _subscribeToRealtime(String userId) {
+    ref
+        .read(transactionRepositoryProvider)
+        .watchUserTransactions(userId)
+        .listen((data) {
+      state = AsyncData(data);
+      // Update cache on stream update
+      final prefs = ref.read(sharedPreferencesProvider);
+      final jsonString = jsonEncode(data.map((e) => e.toJson()).toList());
+      prefs.setString('cached_transactions', jsonString);
+    }, onError: (error) {
+      debugPrint('Error in transaction stream: $error');
+      // Optionally handle specific errors or retry logic here
+    });
+  }
+}
 
 final adminTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   // TODO: Verify admin role here or in repository policy?
@@ -250,7 +335,7 @@ class TransactionService {
       });
     } catch (e) {
       // Fail silently regarding notifications so transaction doesn't fail
-      print('Error creating notification: $e');
+      debugPrint('Error creating notification: $e');
     }
   }
 }

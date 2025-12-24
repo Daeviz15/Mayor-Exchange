@@ -51,17 +51,10 @@ class _BalanceCardState extends State<BalanceCard>
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: AppColors.backgroundCard,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.05),
           ),
@@ -76,10 +69,11 @@ class _BalanceCardState extends State<BalanceCard>
                   children: [
                     Text(
                       'Total Balance',
-                      style: AppTextStyles.labelMedium(context),
+                      style: AppTextStyles.bodyMedium(context).copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    // Animated Eye Toggle
                     GestureDetector(
                       onTap: _toggleBalance,
                       behavior: HitTestBehavior.opaque,
@@ -87,59 +81,69 @@ class _BalanceCardState extends State<BalanceCard>
                         padding: const EdgeInsets.all(4.0),
                         child: AnimatedEyeIcon(
                           isOpen: _isBalanceVisible,
-                          size: 20,
-                          color: AppColors.textSecondary,
+                          size: 26, // Reduced size
                         ),
                       ),
                     ),
                   ],
                 ),
                 if (widget.onViewPortfolio != null)
-                  TextButton(
-                    onPressed: widget.onViewPortfolio,
-                    style: TextButton.styleFrom(
-                      backgroundColor: AppColors.primaryOrange,
-                      foregroundColor: AppColors.textPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                  GestureDetector(
+                    onTap: widget.onViewPortfolio,
                     child: Text(
                       'View Portfolio',
                       style: AppTextStyles.labelMedium(context).copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryOrange,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // Balance Text with Cross-fade
-            AnimatedCrossFade(
-              firstChild: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: widget.balance),
-                duration: const Duration(milliseconds: 1200),
-                curve: Curves.easeOutCubic,
-                builder: (context, animatedValue, child) {
-                  return Text(
-                    '${widget.symbol}${animatedValue.toStringAsFixed(2)}',
-                    style: AppTextStyles.balanceAmount(context),
-                  );
-                },
-              ),
-              secondChild: Text(
-                '${widget.symbol} ****.**',
-                style: AppTextStyles.balanceAmount(context),
-              ),
-              crossFadeState: _isBalanceVisible
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              duration: const Duration(milliseconds: 300),
+            // Add Eye Icon next to balance? Or keep it separate?
+            // Design doesn't explicitly show eye icon, but good for privacy.
+            // We'll attach it to the balance text or remove if strict to design.
+            // Design shows just the balance. Let's keep privacy but maybe simpler.
+            // Wait, design has no eye icon visible.
+            // Let's keep the functionality but maybe tapping the balance toggles it?
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _toggleBalance,
+                    child: AnimatedCrossFade(
+                      firstChild: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: widget.balance),
+                        duration: const Duration(milliseconds: 1200),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, animatedValue, child) {
+                          return Text(
+                            '${widget.symbol}${animatedValue.toStringAsFixed(2)}',
+                            style:
+                                AppTextStyles.headlineLarge(context).copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 32,
+                            ),
+                          );
+                        },
+                      ),
+                      secondChild: Text(
+                        '${widget.symbol} ****.**',
+                        style: AppTextStyles.headlineLarge(context).copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 32,
+                        ),
+                      ),
+                      crossFadeState: _isBalanceVisible
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(
@@ -150,9 +154,21 @@ class _BalanceCardState extends State<BalanceCard>
                   color: isPositive ? AppColors.success : AppColors.error,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  '${isPositive ? '+' : ''}${widget.changePercent.toStringAsFixed(1)}% in last 24h',
-                  style: AppTextStyles.percentageChange(context, isPositive),
+                RichText(
+                  text: TextSpan(
+                    style: AppTextStyles.bodySmall(context),
+                    children: [
+                      TextSpan(
+                        text:
+                            '${isPositive ? '+' : ''}${widget.changePercent.toStringAsFixed(1)}% ',
+                        style: TextStyle(
+                          color:
+                              isPositive ? AppColors.success : AppColors.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -167,13 +183,11 @@ class _BalanceCardState extends State<BalanceCard>
 class AnimatedEyeIcon extends StatefulWidget {
   final bool isOpen;
   final double size;
-  final Color color;
 
   const AnimatedEyeIcon({
     super.key,
     required this.isOpen,
-    this.size = 24,
-    this.color = Colors.white,
+    this.size = 26,
   });
 
   @override
@@ -184,26 +198,23 @@ class _AnimatedEyeIconState extends State<AnimatedEyeIcon>
     with SingleTickerProviderStateMixin {
   late AnimationController _lookController;
   Animation<Offset>? _eyeAnimation;
-
-  // Random generator for eye movement
   final math.Random _random = math.Random();
 
   @override
   void initState() {
     super.initState();
+    // Faster movement duration (was 2000ms)
     _lookController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 400),
     );
 
-    // Initial random movement
     _updateEyeAnimation();
 
-    // Listen to status to trigger new movements
     _lookController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        // Wait a bit then look somewhere else
-        Future.delayed(Duration(milliseconds: 500 + _random.nextInt(1500)), () {
+        // Faster pause between movements (was 500+1500ms)
+        Future.delayed(Duration(milliseconds: 200 + _random.nextInt(800)), () {
           if (mounted && widget.isOpen) {
             _updateEyeAnimation();
             _lookController.forward(from: 0);
@@ -218,12 +229,10 @@ class _AnimatedEyeIconState extends State<AnimatedEyeIcon>
   }
 
   void _updateEyeAnimation() {
-    // Generate a random offset within a small range (-0.3 to 0.3)
-    final double dx = (_random.nextDouble() - 0.5) * 0.6;
-    final double dy = (_random.nextDouble() - 0.5) * 0.4;
+    // Range -0.4 to 0.4 for broader looking
+    final double dx = (_random.nextDouble() - 0.5) * 0.8;
+    final double dy = (_random.nextDouble() - 0.5) * 0.5;
     final Offset target = Offset(dx, dy);
-
-    // Current value (start from where we are)
     final Offset begin = _eyeAnimation?.value ?? Offset.zero;
 
     _eyeAnimation = Tween<Offset>(
@@ -231,7 +240,7 @@ class _AnimatedEyeIconState extends State<AnimatedEyeIcon>
       end: target,
     ).animate(CurvedAnimation(
       parent: _lookController,
-      curve: Curves.elasticOut,
+      curve: Curves.elasticOut, // Snappy look
     ));
   }
 
@@ -240,7 +249,9 @@ class _AnimatedEyeIconState extends State<AnimatedEyeIcon>
     super.didUpdateWidget(oldWidget);
     if (widget.isOpen != oldWidget.isOpen) {
       if (widget.isOpen) {
-        _lookController.forward();
+        // Restart animation
+        _updateEyeAnimation();
+        _lookController.forward(from: 0);
       } else {
         _lookController.stop();
       }
@@ -257,67 +268,108 @@ class _AnimatedEyeIconState extends State<AnimatedEyeIcon>
   Widget build(BuildContext context) {
     return SizedBox(
       width: widget.size,
-      height: widget.size * 0.6, // Eye aspect ratio
+      height: widget.size * 0.6,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Eye Outline / Sclera (White part)
+          // Sclera (White part) - The base of the eye
           AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 150),
             curve: Curves.easeInOut,
             width: widget.size,
-            height: widget.isOpen
-                ? widget.size * 0.6
-                : 2, // Squashes to line when closed
+            height: widget.isOpen ? widget.size * 0.6 : 4,
             decoration: BoxDecoration(
-              border: Border.all(
-                color: widget.color,
-                width: 1.5,
-              ),
-              borderRadius: BorderRadius.all(Radius.elliptical(
-                  widget.size, widget.isOpen ? widget.size * 0.6 : 2)),
+              color: const Color(0xFFEEEEEE), // Slightly off-white sclera
+              borderRadius: BorderRadius.circular(widget.size),
+              border: Border.all(color: Colors.grey.shade400, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                )
+              ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.all(Radius.elliptical(
-                  widget.size, widget.isOpen ? widget.size * 0.6 : 2)),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Pupil
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: widget.isOpen ? 1.0 : 0.0,
-                    child: AnimatedBuilder(
-                      animation: _lookController,
-                      builder: (context, child) {
-                        // Only init animation if not done (defensive)
-                        if (_eyeAnimation == null) return child!;
+              borderRadius: BorderRadius.circular(widget.size),
+              child: Stack(alignment: Alignment.center, children: [
+                // Inner Shadow for depth
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.1)
+                      ],
+                      radius: 1.0,
+                    )),
+                  ),
+                ),
 
-                        return Transform.translate(
-                          offset: Offset(
-                            _eyeAnimation!.value.dx * widget.size * 0.5,
-                            _eyeAnimation!.value.dy * widget.size * 0.3,
-                          ),
-                          child: child,
-                        );
-                      },
-                      child: Container(
-                        width: widget.size * 0.35,
-                        height: widget.size * 0.35,
-                        decoration: BoxDecoration(
-                          color: widget.color,
-                          shape: BoxShape.circle,
+                // Iris and Pupil
+                if (widget.isOpen)
+                  AnimatedBuilder(
+                    animation: _lookController,
+                    builder: (context, child) {
+                      final offset = _eyeAnimation?.value ?? Offset.zero;
+                      return Transform.translate(
+                        offset: Offset(
+                          offset.dx * widget.size * 0.4,
+                          offset.dy * widget.size * 0.2,
+                        ),
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: widget.size * 0.45,
+                      height: widget.size * 0.45,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        // Realistic Iris Gradient - Orange
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.deepOrange.shade900,
+                            AppColors.primaryOrange,
+                            Colors.orange.shade300
+                          ],
+                          stops: const [0.2, 0.7, 1.0],
+                        ),
+                        border: Border.all(
+                            color: Colors.deepOrange.shade900, width: 0.5),
+                      ),
+                      child: Center(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Pupil
+                            Container(
+                              width: widget.size * 0.22,
+                              height: widget.size * 0.22,
+                              decoration: const BoxDecoration(
+                                color: Colors.black,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            // Glint / Reflection (Top Left)
+                            Positioned(
+                              top: widget.size * 0.08,
+                              left: widget.size * 0.08,
+                              child: Container(
+                                width: widget.size * 0.08,
+                                height: widget.size * 0.08,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-
-                  // Eyelid (for blinking/closing effect)
-                  // We actually handle closing by squashing the container height,
-                  // but we could add a lid here if needed.
-                  // The AnimatedContainer height change effectively does the blinking/closing.
-                ],
-              ),
+              ]),
             ),
           ),
         ],

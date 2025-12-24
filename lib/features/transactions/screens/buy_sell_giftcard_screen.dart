@@ -36,9 +36,6 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
   // Sell Fields
   final _cardNumberController = TextEditingController();
   final _pinController = TextEditingController();
-  final _bankNameController = TextEditingController(); // New
-  final _accountNumberController = TextEditingController(); // New
-  final _accountNameController = TextEditingController(); // New
 
   // Selected Card
   String _selectedCard = 'Amazon';
@@ -76,9 +73,6 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
     _amountController.dispose();
     _cardNumberController.dispose();
     _pinController.dispose();
-    _bankNameController.dispose();
-    _accountNumberController.dispose();
-    _accountNameController.dispose();
     super.dispose();
   }
 
@@ -138,9 +132,9 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
           'pin': isBuy ? null : _pinController.text,
           'currency_symbol': currencySymbol, // Save symbol
           if (!isBuy) ...{
-            'user_bank_name': _bankNameController.text.trim(),
-            'user_account_number': _accountNumberController.text.trim(),
-            'user_account_name': _accountNameController.text.trim(),
+            'user_bank_name': 'Fiat Wallet',
+            'user_account_number': 'N/A',
+            'user_account_name': 'Credited to Wallet',
           },
         },
       );
@@ -159,7 +153,17 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
       );
     } catch (e) {
       if (!mounted) return;
-      _showError('Error: $e');
+      // Friendly Error Handling
+      String message = 'An unexpected error occurred. Please try again.';
+      if (e.toString().contains('network')) {
+        message = 'Please check your internet connection.';
+      } else if (e.toString().contains('PostgrestException')) {
+        message = 'We encountered a server error. Support has been notified.';
+        debugPrint('Supabase Error: $e');
+      } else {
+        message = e.toString().replaceAll('Exception: ', '');
+      }
+      _showError(message);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -291,49 +295,42 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Your Bank Details (For Payment)',
-                  style: AppTextStyles.labelMedium(context)),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _bankNameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Bank Name',
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.backgroundCard,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+              const SizedBox(height: 24),
+              // Wallet Credit Info
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.primaryOrange.withOpacity(0.3)),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _accountNumberController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Account Number',
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.backgroundCard,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _accountNameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Account Name',
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.backgroundCard,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.account_balance_wallet,
+                            color: AppColors.primaryOrange, size: 20),
+                        SizedBox(width: 8),
+                        Text('Funds Destination',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Funds will be credited to your Fiat Wallet',
+                      style: AppTextStyles.titleMedium(context)
+                          .copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Once approved, the balance will be instantly available for withdrawal.',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

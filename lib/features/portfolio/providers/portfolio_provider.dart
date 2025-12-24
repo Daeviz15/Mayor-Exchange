@@ -58,14 +58,27 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
   final Map<String, double> cryptoHoldings = {};
 
   for (final t in transactions) {
-    if (t.status != TransactionStatus.completed) continue;
+    // Skip rejected/cancelled transactions entirely
+    if (t.status == TransactionStatus.rejected ||
+        t.status == TransactionStatus.cancelled) continue;
+
+    // For non-withdrawals, we generally only count completed transactions for balance
+    // But for withdrawals, we want to deduct pending ones too.
+    if (t.type != TransactionType.withdrawal &&
+        t.status != TransactionStatus.completed) continue;
 
     switch (t.type) {
       case TransactionType.deposit:
         fiatBalance += t.amountFiat;
         break;
       case TransactionType.withdrawal:
-        fiatBalance -= t.amountFiat;
+        // Deduct if completed OR pending (lock funds)
+        if (t.status == TransactionStatus.completed ||
+            t.status == TransactionStatus.pending ||
+            t.status == TransactionStatus.paymentPending ||
+            t.status == TransactionStatus.verificationPending) {
+          fiatBalance -= t.amountFiat;
+        }
         break;
       case TransactionType.buyCrypto:
         fiatBalance -= t.amountFiat;

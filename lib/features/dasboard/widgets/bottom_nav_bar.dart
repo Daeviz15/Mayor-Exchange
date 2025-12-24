@@ -35,32 +35,37 @@ class AppBottomNavBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.max,
             children: [
               _NavItem(
-                icon: Icons.home,
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home,
                 label: 'Home',
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
-                icon: Icons.folder_outlined,
-                label: 'Portfolio',
+                icon: Icons.swap_horiz_outlined,
+                activeIcon: Icons.swap_horiz,
+                label: 'Trade',
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
               _NavItem(
-                icon: Icons.swap_horiz,
-                label: 'Trade',
+                icon: Icons.card_giftcard_outlined,
+                activeIcon: Icons.card_giftcard,
+                label: 'Giftcard',
                 isActive: currentIndex == 2,
                 onTap: () => onTap(2),
               ),
               _NavItem(
-                icon: Icons.card_giftcard,
-                label: 'Gift Cards',
+                icon: Icons.account_balance_wallet_outlined,
+                activeIcon: Icons.account_balance_wallet,
+                label: 'Wallet',
                 isActive: currentIndex == 3,
                 onTap: () => onTap(3),
               ),
               _NavItem(
-                icon: Icons.settings,
-                label: 'Settings',
+                icon: Icons.grid_view,
+                activeIcon: Icons.grid_view_rounded,
+                label: 'More',
                 isActive: currentIndex == 4,
                 onTap: () => onTap(4),
               ),
@@ -74,12 +79,14 @@ class AppBottomNavBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
+  final IconData? activeIcon;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
+    this.activeIcon,
     required this.label,
     required this.isActive,
     required this.onTap,
@@ -100,11 +107,11 @@ class _NavItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                icon,
+                isActive ? (activeIcon ?? icon) : icon,
                 color: isActive
                     ? AppColors.navBarActive
                     : AppColors.navBarInactive,
-                size: 22,
+                size: 24,
               ),
               const SizedBox(height: 4),
               Flexible(

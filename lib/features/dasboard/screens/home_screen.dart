@@ -20,11 +20,11 @@ class HomeScreen extends ConsumerWidget {
 
     // List of persistent screens
     final List<Widget> screens = [
-      const DashboardTab(), // Index 0
-      const PortfolioScreen(), // Index 1
-      const BuySellCryptoScreen(), // Index 2
-      const GiftCardsScreen(), // Index 3
-      const SettingsScreen(), // Index 4
+      const DashboardTab(), // Index 0: Home
+      const BuySellCryptoScreen(), // Index 1: Trade
+      const GiftCardsScreen(), // Index 2: Giftcard
+      const PortfolioScreen(), // Index 3: Wallet
+      const SettingsScreen(), // Index 4: More
     ];
 
     return Scaffold(

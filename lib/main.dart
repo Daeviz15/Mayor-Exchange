@@ -7,6 +7,8 @@ import 'package:mayor_exchange/core/theme/theme_provider.dart';
 import 'package:mayor_exchange/features/onboarding/screens/splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/widgets/offline_overlay.dart';
+import 'core/providers/shared_preferences_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   // Ensure Flutter is initialized
@@ -19,9 +21,22 @@ Future<void> main() async {
   await Supabase.initialize(
     url: SupabaseConstants.supabaseUrl,
     anonKey: SupabaseConstants.supabaseAnonKey,
+    realtimeClientOptions: const RealtimeClientOptions(
+      timeout: Duration(seconds: 30),
+    ),
   );
 
-  runApp(const ProviderScope(child: MyApp()));
+  // Initialize SharedPreferences
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
