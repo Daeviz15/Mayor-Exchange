@@ -84,61 +84,8 @@ class CoinGeckoService {
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final List<CoinGeckoMarketData> marketData = [];
-
-        for (final coinData in data) {
-          final coinId = coinData['id'] as String;
-          final symbol = _getSymbolFromId(coinId);
-
-          if (symbol != null) {
-            marketData.add(
-              CoinGeckoMarketData(
-                id: coinId,
-                symbol: symbol,
-                name: coinData['name'] as String? ?? _getCoinName(symbol),
-                currentPrice:
-                    (coinData['current_price'] as num?)?.toDouble() ?? 0.0,
-                priceChange24h:
-                    (coinData['price_change_24h'] as num?)?.toDouble() ?? 0.0,
-                priceChangePercent24h:
-                    (coinData['price_change_percentage_24h'] as num?)
-                            ?.toDouble() ??
-                        0.0,
-                high24h: (coinData['high_24h'] as num?)?.toDouble() ?? 0.0,
-                low24h: (coinData['low_24h'] as num?)?.toDouble() ?? 0.0,
-                volume24h:
-                    (coinData['total_volume'] as num?)?.toDouble() ?? 0.0,
-                marketCap: (coinData['market_cap'] as num?)?.toDouble() ?? 0.0,
-                imageUrl: coinData['image'] as String? ?? '',
-                lastUpdated: coinData['last_updated'] != null
-                    ? DateTime.parse(coinData['last_updated'] as String)
-                    : DateTime.now(),
-              ),
-            );
-          }
-        }
-
-        // Sort to maintain specific order if needed, or just return as is
-        marketData.sort((a, b) {
-          final order = [
-            'BTC',
-            'ETH',
-            'SOL',
-            'BNB',
-            'XRP',
-            'ADA',
-            'DOGE',
-            'TRX',
-            'DOT',
-            'USDT',
-          ];
-          final aIndex = order.indexOf(a.symbol);
-          final bIndex = order.indexOf(b.symbol);
-          if (aIndex == -1) return 1;
-          if (bIndex == -1) return -1;
-          return aIndex.compareTo(bIndex);
-        });
+        // Use compute to parse JSON in background
+        final marketData = await compute(_parseMarketData, response.body);
 
         debugPrint(
           '✅ CoinGecko API: Successfully parsed ${marketData.length} coins',
@@ -179,16 +126,6 @@ class CoinGeckoService {
     }
   }
 
-  /// Get symbol from coin ID
-  static String? _getSymbolFromId(String coinId) {
-    for (final entry in _coinIds.entries) {
-      if (entry.value == coinId) {
-        return entry.key;
-      }
-    }
-    return null;
-  }
-
   /// Fetch detailed information for a specific cryptocurrency
   static Future<CoinGeckoCoinDetails> getCoinDetails(String symbol) async {
     try {
@@ -209,35 +146,9 @@ class CoinGeckoService {
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-
-        if (data.isEmpty) {
-          throw Exception('No data found for $symbol');
-        }
-
-        final coinData = data[0];
-        final currentPrice =
-            (coinData['current_price'] as num?)?.toDouble() ?? 0.0;
-        final priceChangePercent24h =
-            (coinData['price_change_percentage_24h'] as num?)?.toDouble() ??
-                0.0;
-        final priceChange24h = currentPrice * (priceChangePercent24h / 100);
-
-        return CoinGeckoCoinDetails(
-          id: coinId,
-          symbol: symbol,
-          name: coinData['name'] as String? ?? _getCoinName(symbol),
-          currentPrice: currentPrice,
-          priceChange24h: priceChange24h,
-          priceChangePercent24h: priceChangePercent24h,
-          high24h: (coinData['high_24h'] as num?)?.toDouble() ?? currentPrice,
-          low24h: (coinData['low_24h'] as num?)?.toDouble() ?? currentPrice,
-          volume24h: (coinData['total_volume'] as num?)?.toDouble() ?? 0.0,
-          marketCap: (coinData['market_cap'] as num?)?.toDouble() ?? 0.0,
-          lastUpdated: coinData['last_updated'] != null
-              ? DateTime.parse(coinData['last_updated'] as String)
-              : DateTime.now(),
-        );
+        // Use compute
+        return await compute(
+            _parseCoinDetails, {'body': response.body, 'symbol': symbol});
       } else {
         throw Exception('Failed to load coin details: ${response.statusCode}');
       }
@@ -267,9 +178,6 @@ class CoinGeckoService {
         TimeRange.oneYear => 365,
       };
 
-      // For 1 hour, we need to be careful. '1' day gives 5-min intervals.
-      // We can filter later.
-
       final url = Uri.parse(
         '$_baseUrl/coins/$coinId/market_chart?vs_currency=usd&days=$days${days > 90 ? "&interval=daily" : ""}',
       );
@@ -281,34 +189,9 @@ class CoinGeckoService {
       debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> prices = data['prices'] as List<dynamic>;
-
-        // Filter based on time range
-        final now = DateTime.now();
-        final DateTime startTime = switch (range) {
-          TimeRange.oneHour => now.subtract(const Duration(hours: 1)),
-          TimeRange.twentyFourHours => now.subtract(const Duration(hours: 24)),
-          TimeRange.oneWeek => now.subtract(const Duration(days: 7)),
-          TimeRange.oneMonth => now.subtract(const Duration(days: 30)),
-          TimeRange.oneYear => now.subtract(const Duration(days: 365)),
-        };
-
-        final List<CoinGeckoPricePoint> pricePoints = [];
-
-        for (final priceData in prices) {
-          final timestamp = DateTime.fromMillisecondsSinceEpoch(
-            (priceData[0] as int),
-          );
-          final price = (priceData[1] as num).toDouble();
-
-          if (timestamp.isAfter(startTime) ||
-              timestamp.isAtSameMomentAs(startTime)) {
-            pricePoints.add(CoinGeckoPricePoint(time: timestamp, price: price));
-          }
-        }
-
-        return pricePoints;
+        // Use compute
+        return await compute(_parseHistoricalData,
+            {'body': response.body, 'days': days, 'rangeIndex': range.index});
       } else {
         throw Exception(
           'Failed to load historical data: ${response.statusCode}',
@@ -318,32 +201,189 @@ class CoinGeckoService {
       throw Exception('Error fetching historical data: $e');
     }
   }
+}
 
-  /// Get coin name from symbol
-  static String _getCoinName(String symbol) {
-    switch (symbol.toUpperCase()) {
-      case 'BTC':
-        return 'Bitcoin';
-      case 'ETH':
-        return 'Ethereum';
-      case 'SOL':
-        return 'Solana';
-      case 'USDT':
-        return 'Tether';
-      case 'BNB':
-        return 'Binance Coin';
-      case 'XRP':
-        return 'XRP';
-      case 'ADA':
-        return 'Cardano';
-      case 'DOGE':
-        return 'Dogecoin';
-      case 'TRX':
-        return 'TRON';
-      case 'DOT':
-        return 'Polkadot';
-      default:
-        return symbol;
+// ---------------- Top Level Functions for Isolates ----------------
+
+// Helper to get symbol from ID (duplicated for isolate access, or passed in?)
+// We'll reimplement specific logic or make the map top-level.
+// To avoid duplication, let's just hardcode the map inside parse function or access strict const.
+const Map<String, String> _isolateCoinIds = {
+  'bitcoin': 'BTC',
+  'ethereum': 'ETH',
+  'solana': 'SOL',
+  'tether': 'USDT',
+  'binancecoin': 'BNB',
+  'ripple': 'XRP',
+  'cardano': 'ADA',
+  'dogecoin': 'DOGE',
+  'tron': 'TRX',
+  'polkadot': 'DOT',
+};
+
+String _getIsolateSymbol(String id) => _isolateCoinIds[id] ?? 'UNKNOWN';
+
+String _getIsolateCoinName(String symbol) {
+  switch (symbol.toUpperCase()) {
+    case 'BTC':
+      return 'Bitcoin';
+    case 'ETH':
+      return 'Ethereum';
+    case 'SOL':
+      return 'Solana';
+    case 'USDT':
+      return 'Tether';
+    case 'BNB':
+      return 'Binance Coin';
+    case 'XRP':
+      return 'XRP';
+    case 'ADA':
+      return 'Cardano';
+    case 'DOGE':
+      return 'Dogecoin';
+    case 'TRX':
+      return 'TRON';
+    case 'DOT':
+      return 'Polkadot';
+    default:
+      return symbol;
+  }
+}
+
+List<CoinGeckoMarketData> _parseMarketData(String body) {
+  final List<dynamic> data = json.decode(body);
+  final List<CoinGeckoMarketData> marketData = [];
+
+  for (final coinData in data) {
+    final coinId = coinData['id'] as String;
+    // We need map lookup here.
+    final symbol = _getIsolateSymbol(coinId);
+
+    if (symbol != 'UNKNOWN') {
+      marketData.add(
+        CoinGeckoMarketData(
+          id: coinId,
+          symbol: symbol,
+          name: coinData['name'] as String? ?? _getIsolateCoinName(symbol),
+          currentPrice: (coinData['current_price'] as num?)?.toDouble() ?? 0.0,
+          priceChange24h:
+              (coinData['price_change_24h'] as num?)?.toDouble() ?? 0.0,
+          priceChangePercent24h:
+              (coinData['price_change_percentage_24h'] as num?)?.toDouble() ??
+                  0.0,
+          high24h: (coinData['high_24h'] as num?)?.toDouble() ?? 0.0,
+          low24h: (coinData['low_24h'] as num?)?.toDouble() ?? 0.0,
+          volume24h: (coinData['total_volume'] as num?)?.toDouble() ?? 0.0,
+          marketCap: (coinData['market_cap'] as num?)?.toDouble() ?? 0.0,
+          imageUrl: coinData['image'] as String? ?? '',
+          lastUpdated: coinData['last_updated'] != null
+              ? DateTime.parse(coinData['last_updated'] as String)
+              : DateTime.now(),
+        ),
+      );
     }
   }
+
+  // Sort
+  marketData.sort((a, b) {
+    final order = [
+      'BTC',
+      'ETH',
+      'SOL',
+      'BNB',
+      'XRP',
+      'ADA',
+      'DOGE',
+      'TRX',
+      'DOT',
+      'USDT',
+    ];
+    final aIndex = order.indexOf(a.symbol);
+    final bIndex = order.indexOf(b.symbol);
+    if (aIndex == -1) return 1;
+    if (bIndex == -1) return -1;
+    return aIndex.compareTo(bIndex);
+  });
+
+  return marketData;
+}
+
+CoinGeckoCoinDetails _parseCoinDetails(Map<String, dynamic> params) {
+  final body = params['body'] as String;
+  final symbol = params['symbol'] as String;
+
+  final List<dynamic> data = json.decode(body);
+  if (data.isEmpty) throw Exception('No data found');
+  final coinData = data[0];
+
+  final currentPrice = (coinData['current_price'] as num?)?.toDouble() ?? 0.0;
+  final priceChangePercent24h =
+      (coinData['price_change_percentage_24h'] as num?)?.toDouble() ?? 0.0;
+  final priceChange24h = currentPrice * (priceChangePercent24h / 100);
+
+  return CoinGeckoCoinDetails(
+    id: coinData['id'],
+    symbol: symbol,
+    name: coinData['name'] as String? ?? _getIsolateCoinName(symbol),
+    currentPrice: currentPrice,
+    priceChange24h: priceChange24h,
+    priceChangePercent24h: priceChangePercent24h,
+    high24h: (coinData['high_24h'] as num?)?.toDouble() ?? currentPrice,
+    low24h: (coinData['low_24h'] as num?)?.toDouble() ?? currentPrice,
+    volume24h: (coinData['total_volume'] as num?)?.toDouble() ?? 0.0,
+    marketCap: (coinData['market_cap'] as num?)?.toDouble() ?? 0.0,
+    lastUpdated: coinData['last_updated'] != null
+        ? DateTime.parse(coinData['last_updated'] as String)
+        : DateTime.now(),
+  );
+}
+
+List<CoinGeckoPricePoint> _parseHistoricalData(Map<String, dynamic> params) {
+  final body = params['body'] as String;
+  final rangeIndex = params['rangeIndex']
+      as int; // We pass index to reconstruct enum if needed, or just switch on int
+
+  final Map<String, dynamic> data = json.decode(body);
+  final List<dynamic> prices = data['prices'] as List<dynamic>;
+
+  // Filter logic
+  final now = DateTime.now();
+  // We can't access TimeRange enum easily if it's not ported, but we can pass resolved startTime timestamp?
+  // Or just pass the millisecondsSinceEpoch of startTime.
+  // Let's infer startTime from days or rangeIndex
+  // To be safe and pure, let's pass startTimeMillis in params.
+
+  // Update: Passing full DateTime arithmetic logic to isolate is fine if we reconstruct.
+  // Simpler: Calculate startTime in main thread and pass it.
+  // But `compute` only accepts one argument. We are passing a Map.
+
+  Duration duration;
+  // 0: 1h, 1: 24h, 2: 1w, 3: 1m, 4: 1y (assuming order)
+  if (rangeIndex == 0)
+    duration = const Duration(hours: 1);
+  else if (rangeIndex == 1)
+    duration = const Duration(hours: 24);
+  else if (rangeIndex == 2)
+    duration = const Duration(days: 7);
+  else if (rangeIndex == 3)
+    duration = const Duration(days: 30);
+  else
+    duration = const Duration(days: 365);
+
+  final startTime = now.subtract(duration);
+
+  final List<CoinGeckoPricePoint> pricePoints = [];
+
+  for (final priceData in prices) {
+    final timestamp = DateTime.fromMillisecondsSinceEpoch(
+      (priceData[0] as int),
+    );
+    final price = (priceData[1] as num).toDouble();
+
+    if (timestamp.isAfter(startTime) || timestamp.isAtSameMomentAs(startTime)) {
+      pricePoints.add(CoinGeckoPricePoint(time: timestamp, price: price));
+    }
+  }
+
+  return pricePoints;
 }

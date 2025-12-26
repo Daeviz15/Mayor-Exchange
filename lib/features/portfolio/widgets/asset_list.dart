@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../portfolio/providers/portfolio_provider.dart';
 
@@ -71,7 +72,13 @@ class _AssetTile extends StatelessWidget {
                     style: TextStyle(fontSize: 24),
                   )
                 : (item.iconUrl != null
-                    ? Image.network(item.iconUrl!, width: 24, height: 24)
+                    ? CachedNetworkImage(
+                        imageUrl: item.iconUrl!,
+                        width: 24,
+                        height: 24,
+                        errorWidget: (context, url, error) =>
+                            Icon(Icons.error, color: AppColors.error),
+                      )
                     : const Icon(Icons.currency_bitcoin,
                         color: AppColors.primaryOrange)),
           ),

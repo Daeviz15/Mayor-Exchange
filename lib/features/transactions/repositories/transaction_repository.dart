@@ -111,6 +111,7 @@ class TransactionRepository {
     String? adminId, // Optional update of admin
     String? proofPath,
     Map<String, dynamic>? details,
+    double? amountFiat,
   }) async {
     final updates = <String, dynamic>{
       'status': newStatus.value,
@@ -120,6 +121,7 @@ class TransactionRepository {
     if (adminId != null) updates['admin_id'] = adminId;
     if (proofPath != null) updates['proof_image_path'] = proofPath;
     if (details != null) updates['details'] = details;
+    if (amountFiat != null) updates['amount_fiat'] = amountFiat;
 
     await _client.from('transactions').update(updates).eq('id', transactionId);
   }

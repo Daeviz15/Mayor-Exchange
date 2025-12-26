@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
-import '../../../core/providers/supabase_provider.dart';
-
+import '../../../core/services/storage_service.dart';
 import '../../../core/widgets/rocket_loader.dart';
 
 class AdminTransactionDetailScreen extends ConsumerStatefulWidget {
@@ -109,6 +109,19 @@ class _AdminTransactionDetailScreenState
           if (transaction.details.containsKey('usd_input'))
             _buildDetailRow(
                 'USD Input', '\$${transaction.details['usd_input']}'),
+
+          // User Info Section
+          Column(
+            children: [
+              _buildDetailRow('User Country',
+                  transaction.details['user_country'] ?? 'Unknown/Old'),
+              _buildDetailRow('User Currency',
+                  transaction.details['user_currency'] ?? 'NGN'),
+              if (transaction.details.containsKey('user_full_name'))
+                _buildDetailRow(
+                    'Full Name', transaction.details['user_full_name']),
+            ],
+          ),
           if (transaction.amountCrypto != null)
             _buildDetailRow('Amount (Crypto)',
                 '${transaction.amountCrypto} ${transaction.currencyPair.split('/').first}'),
@@ -165,40 +178,9 @@ class _AdminTransactionDetailScreenState
                     : 'Proof of Payment',
                 style: AppTextStyles.titleMedium(context)),
             const SizedBox(height: 10),
-            FutureBuilder<String>(
-              future: _getSignedUrl(
-                ref,
-                transaction.proofImagePath!,
-                bucket: transaction.type == TransactionType.sellGiftCard
-                    ? 'gift-cards'
-                    : 'transaction-proofs',
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                      child: RocketLoader(color: AppColors.primaryOrange));
-                }
-                if (snapshot.hasError || !snapshot.hasData) {
-                  return const Text('Error loading image',
-                      style: TextStyle(color: Colors.red));
-                }
-                return GestureDetector(
-                  onTap: () {
-                    // Optionally show full screen
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      snapshot.data!,
-                      height: 300,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.broken_image, color: Colors.grey),
-                    ),
-                  ),
-                );
-              },
+            _TransactionImage(
+              path: transaction.proofImagePath!,
+              type: transaction.type,
             ),
           ],
 
@@ -225,6 +207,65 @@ class _AdminTransactionDetailScreenState
                   color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+
+  Future<void> _approveTransaction(
+      TransactionModel transaction, WidgetRef ref) async {
+    final service = ref.read(transactionServiceProvider);
+    final isBuyGiftCard = transaction.type == TransactionType.buyGiftCard;
+
+    // Merge details
+    final newDetails = Map<String, dynamic>.from(transaction.details);
+
+    if (isBuyGiftCard) {
+      if (_giftCardInfoController.text.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter Gift Card details')));
+        return;
+      }
+      newDetails['gift_card_info'] = _giftCardInfoController.text.trim();
+    }
+
+    // MANUAL PAYOUT LOGIC
+    // Check if we need to set payout amount (Sell Flows)
+    bool needsPayoutAmount = transaction.type == TransactionType.sellCrypto ||
+        transaction.type == TransactionType.sellGiftCard;
+
+    double? finalPayout;
+
+    if (needsPayoutAmount) {
+      // Show Dialog to get Amount
+      if (!mounted) return;
+      final amountStr = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) =>
+            _PayoutDialog(estimatedAmount: transaction.amountFiat),
+      );
+
+      if (amountStr == null) return; // Cancelled
+      finalPayout = double.tryParse(amountStr);
+      if (finalPayout == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid Amount Entered')));
+        return;
+      }
+    }
+
+    await service.updateStatus(
+      transactionId: transaction.id,
+      targetUserId: transaction.userId,
+      newStatus: TransactionStatus.completed,
+      previousStatus: transaction.status,
+      note: 'Admin approved and completed transaction',
+      details: newDetails,
+      finalPayoutAmount: finalPayout, // Pass the manual amount
+      notificationMessage: isBuyGiftCard
+          ? 'Transaction Completed! View details for your code.'
+          : 'Transaction Completed! Your wallet has been credited with ${finalPayout ?? transaction.amountFiat}.',
     );
   }
 
@@ -255,7 +296,6 @@ class _AdminTransactionDetailScreenState
       );
     }
 
-    // 2. Claimed -> Process (Depends on type)
     // 2. Claimed -> Process (Depends on type)
     if (transaction.status == TransactionStatus.claimed) {
       final isBuyRequest = transaction.type == TransactionType.buyGiftCard ||
@@ -316,17 +356,9 @@ class _AdminTransactionDetailScreenState
             // For Sell requests, we might just mark as payment sent if we paid them externally
             // Or if we need to send them money first (unlikely for sell, usually they send assets first)
             _buildActionButton(
-              'Mark Payment Sent',
-              Colors.purple,
-              () => service.updateStatus(
-                transactionId: transaction.id,
-                targetUserId: transaction.userId,
-                newStatus: TransactionStatus.completed,
-                previousStatus: transaction.status,
-                note: 'Admin sent payment to user bank',
-                notificationMessage:
-                    'Payment sent to your bank! Transaction Completed.',
-              ),
+              'Approve & Credit Wallet',
+              Colors.green,
+              () => _approveTransaction(transaction, ref),
             ),
           ],
           const SizedBox(height: 12),
@@ -375,32 +407,7 @@ class _AdminTransactionDetailScreenState
           _buildActionButton(
             'Approve & Complete',
             Colors.green,
-            () async {
-              // Merge details
-              final newDetails = Map<String, dynamic>.from(transaction.details);
-
-              if (isBuyGiftCard) {
-                if (_giftCardInfoController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please enter Gift Card details')));
-                  return;
-                }
-                newDetails['gift_card_info'] =
-                    _giftCardInfoController.text.trim();
-              }
-
-              await service.updateStatus(
-                transactionId: transaction.id,
-                targetUserId: transaction.userId,
-                newStatus: TransactionStatus.completed,
-                previousStatus: transaction.status,
-                note: 'Admin approved and completed transaction',
-                details: newDetails,
-                notificationMessage: isBuyGiftCard
-                    ? 'Transaction Completed! View details for your code.'
-                    : null,
-              );
-            },
+            () => _approveTransaction(transaction, ref),
           ),
           const SizedBox(height: 12),
           _buildActionButton(
@@ -454,23 +461,6 @@ class _AdminTransactionDetailScreenState
     );
   }
 
-  Future<String> _getSignedUrl(WidgetRef ref, String path,
-      {String bucket = 'transaction-proofs'}) async {
-    final client = ref.read(supabaseClientProvider);
-
-    // Fix: Remove bucket name if present in the path
-    String cleanPath = path;
-    if (cleanPath.startsWith('$bucket/')) {
-      cleanPath = cleanPath.replaceFirst('$bucket/', '');
-    }
-
-    // Generate signed URL valid for 60 seconds (or more)
-    final url = await client.storage
-        .from(bucket)
-        .createSignedUrl(cleanPath, 3600); // 1 hour
-    return url;
-  }
-
   Color _getStatusColor(TransactionStatus status) {
     switch (status) {
       case TransactionStatus.pending:
@@ -486,5 +476,130 @@ class _AdminTransactionDetailScreenState
       case TransactionStatus.cancelled:
         return Colors.red;
     }
+  }
+}
+
+// Payout Dialog Widget
+class _PayoutDialog extends StatefulWidget {
+  final double estimatedAmount;
+
+  const _PayoutDialog({required this.estimatedAmount});
+
+  @override
+  State<_PayoutDialog> createState() => _PayoutDialogState();
+}
+
+class _PayoutDialogState extends State<_PayoutDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill with estimated amount
+    _controller.text = widget.estimatedAmount.toStringAsFixed(2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.backgroundCard,
+      title: const Text('Confirm Payout Amount',
+          style: TextStyle(color: AppColors.textPrimary)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Enter the final amount to credit to the user\'s wallet.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Colors.white, fontSize: 18),
+            decoration: InputDecoration(
+              prefixText: '₦ ',
+              prefixStyle: const TextStyle(color: AppColors.primaryOrange),
+              filled: true,
+              fillColor: AppColors.backgroundDark,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryOrange,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('Confirm & Pay',
+              style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+class _TransactionImage extends ConsumerWidget {
+  final String path;
+  final TransactionType type;
+
+  const _TransactionImage({required this.path, required this.type});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bucket = type == TransactionType.sellGiftCard
+        ? 'gift-cards'
+        : 'transaction-proofs';
+
+    final imageAsync =
+        ref.watch(signedUrlProvider((bucket: bucket, path: path)));
+
+    return imageAsync.when(
+      loading: () =>
+          const Center(child: RocketLoader(color: AppColors.primaryOrange)),
+      error: (_, __) => const Text('Error loading image',
+          style: TextStyle(color: Colors.red)),
+      data: (url) => GestureDetector(
+        onTap: () {
+          // Show full screen on tap
+          showDialog(
+            context: context,
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+              child: CachedNetworkImage(imageUrl: url),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: CachedNetworkImage(
+            imageUrl: url,
+            height: 300,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              height: 300,
+              color: Colors.grey[200],
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            errorWidget: (context, url, error) => Container(
+              height: 300,
+              color: Colors.grey[200],
+              child: const Icon(Icons.broken_image, size: 50),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

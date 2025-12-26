@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../crypto/providers/crypto_providers.dart';
-import '../../dasboard/models/crypto_data.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/providers/rates_provider.dart';
@@ -123,31 +122,25 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
     ));
   }
 
+  // Create Lookup Maps for O(1) access
+  final cryptoMap = {
+    for (var c in cryptoList) c.symbol.toUpperCase(): c,
+  };
+  final ratesMap = {
+    for (var r in rates) r.assetSymbol.toUpperCase(): r,
+  };
+
   // Process Crypto Items
   cryptoHoldings.forEach((symbol, quantity) {
     if (quantity <= 0) return;
 
     // 1. Get Metadata (Name, Icon) from CoinGecko (Rich UI)
-    CryptoData? cryptoMeta;
-    try {
-      cryptoMeta =
-          cryptoList.firstWhere((c) => c.symbol.toUpperCase() == symbol);
-    } catch (_) {
-      cryptoMeta = null;
-    }
+    final cryptoMeta = cryptoMap[symbol];
 
     // 2. Get Price from Admin Rates (Authentic Valuation)
     // We use SELL RATE because Net Worth = what you get if you sell.
-    double price = 0.0;
-    try {
-      final rate =
-          rates.firstWhere((r) => r.assetSymbol.toUpperCase() == symbol);
-      price = rate.sellRate;
-    } catch (_) {
-      // If no admin rate is set, the value is effectively 0 in our system
-      // independent of global market price.
-      price = 0.0;
-    }
+    final rate = ratesMap[symbol];
+    final price = rate?.sellRate ?? 0.0;
 
     final valueInNaira = quantity * price;
     cryptoTotalValue += valueInNaira;

@@ -124,3 +124,22 @@ final storageServiceProvider = Provider<StorageService>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return StorageService(client);
 });
+
+/// Signed URL Provider (Cached)
+/// Usage: ref.watch(signedUrlProvider((bucket: 'my-bucket', path: 'path/to/file.jpg')))
+final signedUrlProvider =
+    FutureProvider.family<String, ({String bucket, String path})>(
+        (ref, args) async {
+  final client = ref.watch(supabaseClientProvider);
+
+  // Cleanup path if it contains bucket name
+  String cleanPath = args.path;
+  if (cleanPath.startsWith('${args.bucket}/')) {
+    cleanPath = cleanPath.replaceFirst('${args.bucket}/', '');
+  }
+
+  // Create signed URL valid for 1 hour
+  // Riverpod caches this Future, so subsequent reads are instant/cached
+  // until the provider is invalidated or disposed.
+  return client.storage.from(args.bucket).createSignedUrl(cleanPath, 3600);
+});
