@@ -123,7 +123,16 @@ class TransactionRepository {
     if (details != null) updates['details'] = details;
     if (amountFiat != null) updates['amount_fiat'] = amountFiat;
 
-    await _client.from('transactions').update(updates).eq('id', transactionId);
+    final data = await _client
+        .from('transactions')
+        .update(updates)
+        .eq('id', transactionId)
+        .select();
+
+    if (data.isEmpty) {
+      throw Exception(
+          'Transaction update failed. You may not have permission to update this transaction.');
+    }
   }
 
   /// Create a transaction log entry

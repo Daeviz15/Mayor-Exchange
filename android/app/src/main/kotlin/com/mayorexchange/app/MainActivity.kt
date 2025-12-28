@@ -1,4 +1,4 @@
-package com.example.mayor_exchange
+package com.mayorexchange.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

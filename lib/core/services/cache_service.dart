@@ -47,11 +47,9 @@ class CacheService {
       };
       await prefs.setString('$_prefix$key', json.encode(cacheData));
     } catch (e) {
-      // Silently fail - caching is not critical
     }
   }
 
-  /// Cache list data
   static Future<List<T>?> getList<T>(
     String key,
     T Function(Map<String, dynamic>) fromJson,
@@ -66,7 +64,6 @@ class CacheService {
       final timestamp = DateTime.parse(data['timestamp'] as String);
       final duration = Duration(seconds: data['duration'] as int? ?? _defaultCacheDuration.inSeconds);
       
-      // Check if cache is expired
       if (DateTime.now().difference(timestamp) > duration) {
         await prefs.remove('$_prefix$key');
         return null;
