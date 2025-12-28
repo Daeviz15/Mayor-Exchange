@@ -1,28 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../models/gift_card.dart';
 import '../data/gift_cards_data.dart';
 import '../widgets/gift_card_item.dart';
-import '../../transactions/screens/buy_sell_giftcard_screen.dart';
-import '../../transactions/models/transaction.dart';
+import 'buy_sell_giftcard_screen.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/search_bar_widget.dart';
-import '../widgets/currency_selector.dart';
+import '../../auth/providers/auth_providers.dart';
 
 /// Gift Cards Screen
 /// Main screen for browsing and searching gift cards
-class GiftCardsScreen extends StatefulWidget {
+class GiftCardsScreen extends ConsumerStatefulWidget {
   const GiftCardsScreen({super.key});
 
   @override
-  State<GiftCardsScreen> createState() => _GiftCardsScreenState();
+  ConsumerState<GiftCardsScreen> createState() => _GiftCardsScreenState();
 }
 
-class _GiftCardsScreenState extends State<GiftCardsScreen> {
+class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = GiftCardCategory.all;
-  String _selectedCurrency = 'USD';
 
   List<GiftCard> _allGiftCards = [];
   List<GiftCard> _filteredGiftCards = [];
@@ -74,6 +73,11 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get user's preferred currency from their profile
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.asData?.value;
+    final userCurrency = user?.currency ?? 'NGN';
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
@@ -113,13 +117,22 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
                       ),
                     ],
                   ),
-                  CurrencySelector(
-                    selectedCurrency: _selectedCurrency,
-                    onChanged: (currency) {
-                      setState(() {
-                        _selectedCurrency = currency;
-                      });
-                    },
+                  // Static currency display (based on user's country)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundCard,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      userCurrency,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -284,10 +297,9 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => BuySellGiftCardScreen(
-                        initialType: TransactionType
-                            .sellGiftCard, // Default to Sell as per typical flow, or let them choose tab
-                        initialCard: giftCard.name,
-                        selectedCurrency: _selectedCurrency, // New
+                        giftCard: giftCard,
+                        isBuy:
+                            false, // Default to sell (most common user action)
                       ),
                     ),
                   );

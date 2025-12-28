@@ -47,7 +47,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
         initialData = await compute(_decodeTransactions, jsonString);
       }
     } catch (e) {
-      debugPrint('Error loading cached transactions: $e');
+      // Debug removed
     }
 
     // 2. Setup Realtime Subscription & Fetch Fresh Data
@@ -65,7 +65,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
       // We don't await this inside build, but we update state when done
       _fetchFreshData(userId, !hasCache);
     } catch (e) {
-      debugPrint('Error initiating fetch: $e');
+      // Debug removed
     }
 
     // Subscribe to stream
@@ -76,7 +76,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
       state = AsyncData(data);
       _cacheTransactions(data);
     }, onError: (error) {
-      debugPrint('Error in transaction stream: $error');
+      // Debug removed
     });
   }
 
@@ -94,7 +94,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
       state = AsyncData(transactions);
       _cacheTransactions(transactions);
     } catch (e, stack) {
-      debugPrint('Error fetching fresh transactions: $e');
+      // Debug removed
       if (!state.hasValue) {
         // Only show error if we have no data
         state = AsyncError(e, stack);
@@ -108,7 +108,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
       final jsonString = await compute(_encodeTransactions, transactions);
       await prefs.setString('cached_transactions', jsonString);
     } catch (e) {
-      debugPrint('Error caching transactions: $e');
+      // Debug removed
     }
   }
 }
@@ -175,16 +175,16 @@ class TransactionService {
       updatedAt: DateTime.now(), // DB will override
     );
 
-    debugPrint('Submitting transaction...');
+    // Debug removed
     // Create Transaction
     TransactionModel created;
     try {
       created = await _repository
           .createTransaction(transaction)
           .timeout(const Duration(seconds: 15));
-      debugPrint('Transaction created: ${created.id}');
+      // Debug removed
     } catch (e) {
-      debugPrint('Error creating transaction: $e');
+      // Debug removed
       rethrow;
     }
 
@@ -199,7 +199,7 @@ class TransactionService {
           )
           .timeout(const Duration(seconds: 5));
     } catch (e) {
-      debugPrint('Warning: Failed to create log: $e');
+      // Debug removed
       // Don't fail the transaction just because log failed
     }
 
@@ -409,7 +409,7 @@ class TransactionService {
       });
     } catch (e) {
       // Fail silently regarding notifications so transaction doesn't fail
-      debugPrint('Error creating notification: $e');
+      // Debug removed
     }
   }
 }

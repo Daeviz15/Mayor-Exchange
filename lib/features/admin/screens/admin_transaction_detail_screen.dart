@@ -199,12 +199,22 @@ class _AdminTransactionDetailScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
-          SelectableText(value,
+          SizedBox(
+            width: 120,
+            child: Text(label,
+                style: const TextStyle(color: AppColors.textSecondary)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SelectableText(
+              value,
               style: const TextStyle(
-                  color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
+                  color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.end,
+            ),
+          ),
         ],
       ),
     );
@@ -255,6 +265,26 @@ class _AdminTransactionDetailScreenState
       }
     }
 
+    // Build notification message based on transaction type
+    String notificationMessage;
+    if (transaction.type == TransactionType.buyCrypto) {
+      // Buy Crypto: Crypto sent to user's external wallet (NO wallet credit)
+      final asset = transaction.details['asset'] ?? 'Crypto';
+      final targetAddress =
+          transaction.details['target_address'] ?? 'your wallet';
+      final cryptoAmount = transaction.amountCrypto?.toStringAsFixed(6) ?? '0';
+      notificationMessage =
+          'Transaction Completed! Your $cryptoAmount $asset has been sent to $targetAddress.';
+    } else if (transaction.type == TransactionType.buyGiftCard) {
+      // Buy Gift Card: Code provided
+      notificationMessage =
+          'Transaction Completed! View details for your code.';
+    } else {
+      // Sell Crypto / Sell GiftCard: Wallet credited
+      notificationMessage =
+          'Transaction Completed! Your wallet has been credited with ${finalPayout ?? transaction.amountFiat}.';
+    }
+
     await service.updateStatus(
       transactionId: transaction.id,
       targetUserId: transaction.userId,
@@ -262,10 +292,8 @@ class _AdminTransactionDetailScreenState
       previousStatus: transaction.status,
       note: 'Admin approved and completed transaction',
       details: newDetails,
-      finalPayoutAmount: finalPayout, // Pass the manual amount
-      notificationMessage: isBuyGiftCard
-          ? 'Transaction Completed! View details for your code.'
-          : 'Transaction Completed! Your wallet has been credited with ${finalPayout ?? transaction.amountFiat}.',
+      finalPayoutAmount: finalPayout,
+      notificationMessage: notificationMessage,
     );
   }
 
@@ -381,10 +409,120 @@ class _AdminTransactionDetailScreenState
     if (transaction.status == TransactionStatus.verificationPending ||
         transaction.status == TransactionStatus.paymentPending) {
       final isBuyGiftCard = transaction.type == TransactionType.buyGiftCard;
+      final isBuyCrypto = transaction.type == TransactionType.buyCrypto;
+      final isBuyRequest = isBuyGiftCard || isBuyCrypto;
+      final hasProof = transaction.proofImagePath != null;
+      final userName = transaction.details['user_full_name'] ?? 'User';
 
+      // For BUY requests in payment_pending without proof - show waiting message
+      if (isBuyRequest &&
+          transaction.status == TransactionStatus.paymentPending &&
+          !hasProof) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Waiting for payment message
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_top,
+                      color: Colors.amber, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Waiting for Payment',
+                          style: AppTextStyles.titleSmall(context).copyWith(
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Waiting for $userName to make payment and upload proof.',
+                          style:
+                              TextStyle(color: Colors.amber[200], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Show payment details sent
+            if (transaction.details['admin_bank_details'] != null) ...[
+              Text('Payment Details Sent:',
+                  style: AppTextStyles.bodySmall(context)
+                      .copyWith(color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundCard,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  transaction.details['admin_bank_details'].toString(),
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            _buildActionButton(
+              'Cancel Transaction',
+              Colors.red,
+              () => service.updateStatus(
+                transactionId: transaction.id,
+                targetUserId: transaction.userId,
+                newStatus: TransactionStatus.rejected,
+                previousStatus: transaction.status,
+                note: 'Cancelled by admin - user did not pay',
+              ),
+            ),
+          ],
+        );
+      }
+
+      // Has proof or verification_pending - show approve/reject buttons
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Proof received indicator for buy requests
+          if (isBuyRequest && hasProof) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Payment proof received from $userName. Review and approve.',
+                      style: TextStyle(color: Colors.green[300], fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (isBuyGiftCard) ...[
             Text('Gift Card Code / Details:',
                 style: AppTextStyles.bodySmall(context)
@@ -557,9 +695,8 @@ class _TransactionImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bucket = type == TransactionType.sellGiftCard
-        ? 'gift-cards'
-        : 'transaction-proofs';
+    // All transaction images are uploaded to 'transaction-proofs' bucket
+    const bucket = 'transaction-proofs';
 
     final imageAsync =
         ref.watch(signedUrlProvider((bucket: bucket, path: path)));

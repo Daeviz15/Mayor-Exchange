@@ -109,7 +109,7 @@ class StorageService {
       await _supabaseClient.storage.from(_profileBucket).remove([filePath]);
     } catch (e) {
       // Silently fail - deletion is not critical
-      debugPrint('Failed to delete profile image: $e');
+      // Debug removed
     }
   }
 

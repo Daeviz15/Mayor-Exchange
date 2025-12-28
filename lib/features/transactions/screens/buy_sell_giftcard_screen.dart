@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/services/storage_service.dart';
 import '../../auth/providers/auth_providers.dart';
@@ -154,15 +155,8 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
     } catch (e) {
       if (!mounted) return;
       // Friendly Error Handling
-      String message = 'An unexpected error occurred. Please try again.';
-      if (e.toString().contains('network')) {
-        message = 'Please check your internet connection.';
-      } else if (e.toString().contains('PostgrestException')) {
-        message = 'We encountered a server error. Support has been notified.';
-        debugPrint('Supabase Error: $e');
-      } else {
-        message = e.toString().replaceAll('Exception: ', '');
-      }
+      // Friendly Error Handling
+      final message = ErrorHandlerUtils.getUserFriendlyErrorMessage(e);
       _showError(message);
     } finally {
       if (mounted) setState(() => _isLoading = false);

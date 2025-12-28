@@ -59,12 +59,16 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
   for (final t in transactions) {
     // Skip rejected/cancelled transactions entirely
     if (t.status == TransactionStatus.rejected ||
-        t.status == TransactionStatus.cancelled) continue;
+        t.status == TransactionStatus.cancelled) {
+      continue;
+    }
 
     // For non-withdrawals, we generally only count completed transactions for balance
     // But for withdrawals, we want to deduct pending ones too.
     if (t.type != TransactionType.withdrawal &&
-        t.status != TransactionStatus.completed) continue;
+        t.status != TransactionStatus.completed) {
+      continue;
+    }
 
     switch (t.type) {
       case TransactionType.deposit:
@@ -80,25 +84,20 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
         }
         break;
       case TransactionType.buyCrypto:
-        fiatBalance -= t.amountFiat;
-        final asset = t.details['asset']?.toString().toUpperCase() ?? '';
-        final amount = t.amountCrypto ?? 0.0;
-        if (asset.isNotEmpty) {
-          cryptoHoldings[asset] = (cryptoHoldings[asset] ?? 0.0) + amount;
-        }
+        // BUY CRYPTO: User pays admin directly (external payment)
+        // NO fiat balance change - user receives crypto at their external wallet
+        // We also don't track crypto holdings here since crypto goes to external wallet
         break;
       case TransactionType.sellCrypto:
+        // SELL CRYPTO: Admin credits user's fiat wallet
         fiatBalance += t.amountFiat;
-        final asset = t.details['asset']?.toString().toUpperCase() ?? '';
-        final amount = t.amountCrypto ?? 0.0;
-        if (asset.isNotEmpty) {
-          cryptoHoldings[asset] = (cryptoHoldings[asset] ?? 0.0) - amount;
-        }
         break;
       case TransactionType.buyGiftCard:
-        fiatBalance -= t.amountFiat;
+        // BUY GIFT CARD: User pays admin directly (external payment)
+        // NO fiat balance change - user receives gift card code
         break;
       case TransactionType.sellGiftCard:
+        // SELL GIFT CARD: Admin credits user's fiat wallet
         fiatBalance += t.amountFiat;
         break;
     }

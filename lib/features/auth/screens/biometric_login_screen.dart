@@ -188,7 +188,7 @@ class _BiometricLoginScreenState extends ConsumerState<BiometricLoginScreen>
         );
       }
     } catch (e) {
-      debugPrint('Biometric Error: $e');
+      // Debug removed
       if (!mounted) return;
 
       String errorMessage = 'Authentication failed. Please use password.';

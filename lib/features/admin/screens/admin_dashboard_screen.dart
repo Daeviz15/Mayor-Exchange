@@ -6,7 +6,7 @@ import '../../transactions/models/transaction.dart';
 import '../../transactions/repositories/transaction_repository.dart';
 import 'admin_transaction_detail_screen.dart';
 import 'admin_rates_screen.dart';
-import 'admin_bank_details_screen.dart';
+import 'admin_giftcard_rates_screen.dart';
 import 'admin_wallet_settings_screen.dart';
 import 'admin_kyc_list_screen.dart';
 
@@ -75,19 +75,20 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
           IconButton(
             icon: const Icon(Icons.currency_exchange,
                 color: AppColors.primaryOrange),
-            tooltip: 'Exchange Rates',
+            tooltip: 'Crypto Rates',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminRatesScreen()),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.account_balance,
-                color: AppColors.primaryOrange),
-            tooltip: 'Bank Settings',
+            icon:
+                const Icon(Icons.card_giftcard, color: AppColors.primaryOrange),
+            tooltip: 'Gift Card Rates',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AdminBankDetailsScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const AdminGiftCardRatesScreen()),
             ),
           ),
           IconButton(

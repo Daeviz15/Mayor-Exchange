@@ -28,7 +28,7 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
     final isAdmin = response['role'] == 'admin';
     return isAdmin;
   } catch (e) {
-    debugPrint('Admin Check Error: $e');
+    // Debug removed
     // On any error (network, etc), fail safe to false (user)
     return false;
   }

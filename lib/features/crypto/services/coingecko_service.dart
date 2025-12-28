@@ -41,13 +41,64 @@ class CoinGeckoService {
 
   /// Fetch market data for multiple cryptocurrencies
   /// Returns list of market data for BTC, ETH, and SOL
-  /// Uses cache to reduce API calls (5 minute cache duration)
+  /// Always fetches fresh data when online, uses cache as fallback when offline
   static Future<List<CoinGeckoMarketData>> getMarketData(
       {bool forceRefresh = false}) async {
     const cacheKey = 'coingecko_market_data';
 
-    // Try to get from cache first (unless force refresh)
-    if (!forceRefresh) {
+    // Always try to fetch fresh data first
+    try {
+      final coinIds = _coinIds.values.join(',');
+      final url = Uri.parse(
+        '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinIds&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h',
+      );
+
+      // Debug removed
+      final response = await http.get(url, headers: _getHeaders()).timeout(
+            const Duration(seconds: 10),
+          );
+      // Debug removed
+
+      if (response.statusCode == 200) {
+        // Use compute to parse JSON in background
+        final marketData = await compute(_parseMarketData, response.body);
+
+        debugPrint(
+          '✅ CoinGecko API: Successfully fetched ${marketData.length} coins (FRESH)',
+        );
+
+        // Cache the data for offline fallback
+        await CacheService.setList<CoinGeckoMarketData>(
+          cacheKey,
+          marketData,
+          (data) => {
+            'id': data.id,
+            'symbol': data.symbol,
+            'name': data.name,
+            'currentPrice': data.currentPrice,
+            'priceChange24h': data.priceChange24h,
+            'priceChangePercent24h': data.priceChangePercent24h,
+            'high24h': data.high24h,
+            'low24h': data.low24h,
+            'volume24h': data.volume24h,
+            'marketCap': data.marketCap,
+            'imageUrl': data.imageUrl,
+            'lastUpdated': data.lastUpdated.toIso8601String(),
+          },
+          duration: const Duration(hours: 24), // Cache for offline use
+        );
+
+        return marketData;
+      } else {
+        debugPrint(
+          '❌ CoinGecko API: Failed with status ${response.statusCode}',
+        );
+        throw Exception('API returned ${response.statusCode}');
+      }
+    } catch (e) {
+      // Debug removed
+
+      // Fallback to cache when offline or API fails
       final cached = await CacheService.getList<CoinGeckoMarketData>(
         cacheKey,
         (json) => CoinGeckoMarketData(
@@ -68,60 +119,13 @@ class CoinGeckoService {
       );
 
       if (cached != null && cached.isNotEmpty) {
-        debugPrint('✅ CoinGecko API: Using cached market data');
+        debugPrint(
+            '📦 CoinGecko API: Using OFFLINE cache (${cached.length} coins)');
         return cached;
       }
-    }
 
-    try {
-      final coinIds = _coinIds.values.join(',');
-      final url = Uri.parse(
-        '$_baseUrl/coins/markets?vs_currency=usd&ids=$coinIds&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h',
-      );
-
-      debugPrint('🌐 CoinGecko API: Requesting market data from: $url');
-      final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        // Use compute to parse JSON in background
-        final marketData = await compute(_parseMarketData, response.body);
-
-        debugPrint(
-          '✅ CoinGecko API: Successfully parsed ${marketData.length} coins',
-        );
-
-        // Cache the data for 5 minutes
-        await CacheService.setList<CoinGeckoMarketData>(
-          cacheKey,
-          marketData,
-          (data) => {
-            'id': data.id,
-            'symbol': data.symbol,
-            'name': data.name,
-            'currentPrice': data.currentPrice,
-            'priceChange24h': data.priceChange24h,
-            'priceChangePercent24h': data.priceChangePercent24h,
-            'high24h': data.high24h,
-            'low24h': data.low24h,
-            'volume24h': data.volume24h,
-            'marketCap': data.marketCap,
-            'imageUrl': data.imageUrl,
-            'lastUpdated': data.lastUpdated.toIso8601String(),
-          },
-          duration: const Duration(minutes: 5),
-        );
-
-        return marketData;
-      } else {
-        debugPrint(
-          '❌ CoinGecko API: Failed with status ${response.statusCode}',
-        );
-        debugPrint('📄 Response body: ${response.body}');
-        throw Exception('Failed to load market data: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('❌ CoinGecko API: Exception in getMarketData: $e');
+      // No cache available, rethrow the error
+      // Debug removed
       throw Exception('Error fetching market data: $e');
     }
   }
@@ -143,7 +147,7 @@ class CoinGeckoService {
         '🌐 CoinGecko API: Requesting coin details for $symbol from: $url',
       );
       final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
+      // Debug removed
 
       if (response.statusCode == 200) {
         // Use compute
@@ -186,7 +190,7 @@ class CoinGeckoService {
         '🌐 CoinGecko API: Requesting historical data for $symbol from: $url',
       );
       final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinGecko API: Response status: ${response.statusCode}');
+      // Debug removed
 
       if (response.statusCode == 200) {
         // Use compute
@@ -359,9 +363,9 @@ List<CoinGeckoPricePoint> _parseHistoricalData(Map<String, dynamic> params) {
 
   Duration duration;
   // 0: 1h, 1: 24h, 2: 1w, 3: 1m, 4: 1y (assuming order)
-  if (rangeIndex == 0)
+  if (rangeIndex == 0) {
     duration = const Duration(hours: 1);
-  else if (rangeIndex == 1)
+  } else if (rangeIndex == 1)
     duration = const Duration(hours: 24);
   else if (rangeIndex == 2)
     duration = const Duration(days: 7);

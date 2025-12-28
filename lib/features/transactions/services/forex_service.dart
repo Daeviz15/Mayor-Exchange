@@ -127,6 +127,13 @@ class ForexService {
     return amountInNgn / rate;
   }
 
+  /// Convert Foreign Currency -> NGN (Base)
+  double convertToNgn(double amountInForeign, String foreignCurrency) {
+    if (foreignCurrency == 'NGN') return amountInForeign;
+    final rate = _rates[foreignCurrency] ?? 1.0;
+    return amountInForeign * rate;
+  }
+
   // Helper to force refresh manually if needed
   Future<void> refresh() async {
     final prefs = await SharedPreferences.getInstance();

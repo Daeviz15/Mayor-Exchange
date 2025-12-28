@@ -42,36 +42,27 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
             .toList();
       }
     } catch (e) {
-      debugPrint('Error loading cached crypto list: $e');
+      // Debug removed
     }
     return [];
   }
 
   Future<void> _fetchFreshData({bool forceRefresh = false}) async {
     final prefs = ref.read(sharedPreferencesProvider);
-    final lastFetch = prefs.getInt('last_crypto_fetch_time') ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final cacheAge = now - lastFetch;
-    const cacheDuration = 5 * 60 * 1000; // 5 minutes
 
-    // If cache is fresh (< 5 mins) and we have data, skip fetch unless forced
-    if (!forceRefresh &&
-        cacheAge < cacheDuration &&
-        (state.asData?.value.isNotEmpty ?? false)) {
-      debugPrint(
-          '⚡ CryptoListProvider: Cache is fresh (${(cacheAge / 1000).round()}s). Skipping API.');
-      return;
-    }
-
+    // Show loading only if we have no data yet
     if (state.asData?.value.isEmpty ?? true) {
       state = const AsyncLoading();
     }
 
     try {
-      debugPrint('🔍 CryptoListProvider: Fetching fresh crypto market data...');
+      // Debug removed
       final marketData = await CoinGeckoService.getMarketData();
 
       final List<CryptoData> cryptoList = [];
+
+      final fetchTime = DateTime.now();
 
       for (final data in marketData) {
         final chartPoints = _generateChartData(
@@ -90,6 +81,7 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
             iconLetter: _getIconLetter(data.symbol),
             iconUrl: data.imageUrl.isNotEmpty ? data.imageUrl : null,
             chartData: chartPoints,
+            lastUpdated: fetchTime,
           ),
         );
       }
@@ -102,7 +94,7 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
       // Update State
       state = AsyncData(cryptoList);
     } catch (e, stack) {
-      debugPrint('❌ CryptoListProvider ERROR: $e');
+      // Debug removed
       // If we have cached data, we keep it but maybe show a snackbar (UI responsibility)
       // or we set state to Error only if we have no data?
       if (state.asData?.value.isEmpty ?? true) {

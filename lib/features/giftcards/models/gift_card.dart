@@ -10,6 +10,7 @@ class GiftCard {
   final String? logoText; // Text to display if no image
   final IconData? icon; // Icon to display if no image/text
   final String? imageAsset; // Asset path for logo image (optional)
+  final String? redemptionUrl; // URL where user can redeem the gift card
 
   GiftCard({
     required this.id,
@@ -19,7 +20,16 @@ class GiftCard {
     this.logoText,
     this.icon,
     this.imageAsset,
+    this.redemptionUrl,
   });
+
+  /// Get redemption instructions based on card type
+  String get redemptionInstructions {
+    if (redemptionUrl != null) {
+      return 'Redeem at $redemptionUrl';
+    }
+    return 'Visit the official $name website to redeem your code.';
+  }
 }
 
 /// Gift Card Categories
@@ -34,4 +44,3 @@ class GiftCardCategory {
   static const String supermarkets = 'Supermarkets';
   static const String automobile = 'Automobile';
 }
-

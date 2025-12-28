@@ -115,6 +115,13 @@ class AuthRepository {
         email: user.email ?? email,
         fullName: _deriveFullName(user.userMetadata),
         avatarUrl: user.userMetadata?['avatar_url'] as String?,
+        phoneNumber: user.userMetadata?['phone_number'] as String?,
+        dateOfBirth: user.userMetadata?['date_of_birth'] != null
+            ? DateTime.tryParse(user.userMetadata!['date_of_birth'] as String)
+            : null,
+        address: user.userMetadata?['address'] as String?,
+        country: user.userMetadata?['country'] as String?,
+        currency: user.userMetadata?['currency'] as String?,
         createdAt: DateTime.parse(user.createdAt),
       );
     } on AuthException catch (e) {

@@ -20,22 +20,37 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   final ImagePicker _picker = ImagePicker();
   String? _uploadingDocType;
   late AnimationController _controller;
+
+  // Store locally picked files for preview during upload
+  final Map<String, File> _pickedFiles = {};
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 4), // Slower, smoother animation
       vsync: this,
-    )..repeat(reverse: true);
+    )..repeat(); // Continuous rotation (no reverse)
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes to pause animation when not visible
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      // Note: RouteObserver would need to be added at MaterialApp level
+      // For now, we'll rely on dispose
+    }
   }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
@@ -45,7 +60,12 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
-    setState(() => _uploadingDocType = docType);
+    // Store picked file for immediate preview
+    setState(() {
+      _uploadingDocType = docType;
+      _pickedFiles[docType] = File(picked.path);
+    });
+
     try {
       final tempDir = await getTemporaryDirectory();
       final targetPath =
@@ -70,6 +90,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
             content: Text('Document uploaded successfully'),
             backgroundColor: AppColors.success),
       );
+
+      // Clear local file after successful upload (server image will be used)
+      _pickedFiles.remove(docType);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,6 +100,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
             content: Text('Failed to upload: $e'),
             backgroundColor: AppColors.error),
       );
+      // Keep local file so user can see what failed
     } finally {
       if (mounted) setState(() => _uploadingDocType = null);
     }
@@ -146,6 +170,128 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
                     ),
                   ),
                 ],
+              ),
+            );
+          }
+
+          // All 3 documents uploaded - show animated pending verification screen
+          final allDocsUploaded = kyc != null &&
+              kyc.identityDocUrl != null &&
+              kyc.addressDocUrl != null &&
+              kyc.selfieUrl != null;
+
+          if (isInProgress || allDocsUploaded) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Custom animated hourglass with sand + rotation
+                    SizedBox(
+                      width: 140,
+                      height: 180,
+                      child: AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          // Smooth 180° rotation over the animation cycle
+                          final rotationAngle =
+                              _controller.value * 3.14159; // 0 to π
+                          return Transform.rotate(
+                            angle: rotationAngle,
+                            child: CustomPaint(
+                              painter: _HourglassPainter(
+                                progress: _controller.value,
+                                sandColor: AppColors.primaryOrange,
+                                glassColor:
+                                    Colors.white.withValues(alpha: 0.15),
+                                frameColor: AppColors.primaryOrange,
+                              ),
+                              size: const Size(140, 180),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    // Animated dots after "Pending"
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        final dots =
+                            '.' * ((_controller.value * 3).toInt() + 1);
+                        return Text(
+                          'Verification Pending$dots',
+                          style: const TextStyle(
+                            color: AppColors.primaryOrange,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'All documents submitted successfully!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Your documents are being reviewed by our team.\nThis usually takes 1-2 business days.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 40),
+                    // Reassuring info card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryOrange
+                                  .withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_outlined,
+                              color: AppColors.primaryOrange,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              "We'll notify you once verification is complete.",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -325,6 +471,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
         : color.withValues(alpha: 0.5);
 
     final isThisUploading = _uploadingDocType == docType;
+    final localFile = _pickedFiles[docType];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -375,47 +522,96 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
             ],
           ),
 
-          // Image Preview
-          if (imageUrl != null) ...[
+          // Image Preview - show local file or server URL
+          if (localFile != null || imageUrl != null) ...[
             const SizedBox(height: 16),
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: AppColors.backgroundElevated,
-                image: DecorationImage(
-                  image: CachedNetworkImageProvider(imageUrl),
-                  fit: BoxFit.cover,
+            Stack(
+              children: [
+                Container(
+                  height: 150,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.backgroundElevated,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: localFile != null
+                        ? Image.file(
+                            localFile,
+                            fit: BoxFit.cover,
+                            height: 150,
+                            width: double.infinity,
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: imageUrl!,
+                            fit: BoxFit.cover,
+                            height: 150,
+                            width: double.infinity,
+                            placeholder: (context, url) => const Center(
+                              child: RocketLoader(size: 30),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child:
+                                  Icon(Icons.broken_image, color: Colors.grey),
+                            ),
+                          ),
+                  ),
                 ),
-              ),
+                // Upload overlay with loading indicator
+                if (isThisUploading)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            RocketLoader(size: 30, color: Colors.white),
+                            SizedBox(height: 8),
+                            Text(
+                              'Uploading...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
 
-          if (onUpload != null) ...[
+          if (onUpload != null && !isThisUploading) ...[
             const SizedBox(height: 16),
-            if (isThisUploading)
-              const Center(child: RocketLoader(size: 40))
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: onUpload,
-                  icon: const Icon(Icons.upload_file,
-                      size: 20, color: Colors.white),
-                  label: Text(
-                      isUploaded ? 'Re-Upload Document' : 'Upload Document',
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE64A19), // Deep Orange
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24)),
-                    elevation: 0,
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onUpload,
+                icon: const Icon(Icons.upload_file,
+                    size: 20, color: Colors.white),
+                label: Text(
+                    isUploaded || localFile != null
+                        ? 'Re-Upload Document'
+                        : 'Upload Document',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE64A19), // Deep Orange
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24)),
+                  elevation: 0,
                 ),
               ),
+            ),
           ],
           if (isUploaded && onUpload == null) ...[
             const SizedBox(height: 12),
@@ -481,5 +677,193 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen>
         ],
       ),
     );
+  }
+}
+
+/// Custom painter for animated hourglass with flowing sand
+class _HourglassPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0 (animation progress)
+  final Color sandColor;
+  final Color glassColor;
+  final Color frameColor;
+
+  _HourglassPainter({
+    required this.progress,
+    required this.sandColor,
+    required this.glassColor,
+    required this.frameColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final width = size.width * 0.65;
+    final height = size.height * 0.8;
+    final neckWidth = 6.0; // Width of the narrow middle part
+
+    // Sand flows from top to bottom over the full animation cycle
+    // progress 0.0 = full top, 0.5 = half/half, 1.0 = full bottom
+    final topSandLevel = 1.0 - progress;
+    final bottomSandLevel = progress;
+
+    // Define key points for hourglass shape
+    final topY = centerY - height / 2;
+    final bottomY = centerY + height / 2;
+    final neckY = centerY;
+
+    // Build hourglass path (curvy hourglass)
+    Path buildHourglassPath() {
+      final path = Path();
+
+      // Start from top-left
+      path.moveTo(centerX - width / 2, topY);
+
+      // Top edge
+      path.lineTo(centerX + width / 2, topY);
+
+      // Right side - curve down to neck
+      path.quadraticBezierTo(
+        centerX + width / 2,
+        neckY - 20,
+        centerX + neckWidth / 2,
+        neckY,
+      );
+
+      // Right side - curve down to bottom
+      path.quadraticBezierTo(
+        centerX + width / 2,
+        neckY + 20,
+        centerX + width / 2,
+        bottomY,
+      );
+
+      // Bottom edge
+      path.lineTo(centerX - width / 2, bottomY);
+
+      // Left side - curve up to neck
+      path.quadraticBezierTo(
+        centerX - width / 2,
+        neckY + 20,
+        centerX - neckWidth / 2,
+        neckY,
+      );
+
+      // Left side - curve up to top
+      path.quadraticBezierTo(
+        centerX - width / 2,
+        neckY - 20,
+        centerX - width / 2,
+        topY,
+      );
+
+      path.close();
+      return path;
+    }
+
+    final hourglassPath = buildHourglassPath();
+
+    // Paints
+    final glassPaint = Paint()
+      ..color = glassColor
+      ..style = PaintingStyle.fill;
+
+    final framePaint = Paint()
+      ..color = frameColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final sandPaint = Paint()
+      ..color = sandColor
+      ..style = PaintingStyle.fill;
+
+    final streamPaint = Paint()
+      ..color = sandColor
+      ..strokeWidth = 2;
+
+    // Draw glass background
+    canvas.drawPath(hourglassPath, glassPaint);
+
+    // Clip to hourglass shape for sand
+    canvas.save();
+    canvas.clipPath(hourglassPath);
+
+    // Draw sand in top chamber (triangle shape)
+    if (topSandLevel > 0.02) {
+      final sandHeight = (height / 2 - 15) * topSandLevel;
+      final sandTop = topY + 5;
+      final sandBottom = topY + 5 + sandHeight;
+      // Width tapers as it goes down
+      final widthAtBottom =
+          width * 0.4 * (1 - sandHeight / (height / 2 - 15)) + neckWidth;
+
+      final topSandPath = Path();
+      topSandPath.moveTo(centerX - width / 2 + 5, sandTop);
+      topSandPath.lineTo(centerX + width / 2 - 5, sandTop);
+      topSandPath.lineTo(centerX + widthAtBottom / 2, sandBottom);
+      topSandPath.lineTo(centerX - widthAtBottom / 2, sandBottom);
+      topSandPath.close();
+
+      canvas.drawPath(topSandPath, sandPaint);
+    }
+
+    // Draw sand in bottom chamber (inverted triangle, fills from bottom up)
+    if (bottomSandLevel > 0.02) {
+      final sandHeight = (height / 2 - 15) * bottomSandLevel;
+      final sandBottom = bottomY - 5;
+      final sandTop = sandBottom - sandHeight;
+      // Width increases as sand piles up
+      final widthAtTop = width * 0.4 * bottomSandLevel + neckWidth;
+
+      final bottomSandPath = Path();
+      bottomSandPath.moveTo(centerX - widthAtTop / 2, sandTop);
+      bottomSandPath.lineTo(centerX + widthAtTop / 2, sandTop);
+      bottomSandPath.lineTo(centerX + width / 2 - 5, sandBottom);
+      bottomSandPath.lineTo(centerX - width / 2 + 5, sandBottom);
+      bottomSandPath.close();
+
+      canvas.drawPath(bottomSandPath, sandPaint);
+    }
+
+    // Draw falling sand stream through neck
+    if (progress > 0.05 && progress < 0.95) {
+      canvas.drawLine(
+        Offset(centerX, neckY - 12),
+        Offset(centerX, neckY + 12),
+        streamPaint,
+      );
+    }
+
+    canvas.restore();
+
+    // Draw hourglass frame outline
+    canvas.drawPath(hourglassPath, framePaint);
+
+    // Draw decorative caps at top and bottom
+    final capPaint = Paint()
+      ..color = frameColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+
+    // Top cap
+    canvas.drawLine(
+      Offset(centerX - width / 2 - 8, topY),
+      Offset(centerX + width / 2 + 8, topY),
+      capPaint,
+    );
+
+    // Bottom cap
+    canvas.drawLine(
+      Offset(centerX - width / 2 - 8, bottomY),
+      Offset(centerX + width / 2 + 8, bottomY),
+      capPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HourglassPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

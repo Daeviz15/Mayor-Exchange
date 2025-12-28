@@ -89,17 +89,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Header with Back Button
+              // 1. Header with Back Button (only if we can pop)
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_ios,
-                        color: Colors.white, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  const SizedBox(width: 16),
+                  if (Navigator.of(context).canPop()) ...[
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_ios,
+                          color: Colors.white, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
                   const Text(
                     'Settings',
                     style: TextStyle(
@@ -159,10 +161,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   MaterialPageRoute(
                       builder: (_) => const KycVerificationScreen()),
                 ),
-              ),
-              SettingsItem(
-                title: 'Payment Methods',
-                onTap: () {},
               ),
 
               // 3. Security Section

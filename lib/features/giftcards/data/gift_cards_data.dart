@@ -1,9 +1,52 @@
 import 'package:flutter/material.dart';
 import '../models/gift_card.dart';
 
+/// Redemption URLs for popular gift cards
+const Map<String, String> _redemptionUrls = {
+  'nintendo': 'redeem.nintendo.com',
+  'playstation': 'store.playstation.com/redeem',
+  'xbox': 'redeem.microsoft.com',
+  'steam': 'store.steampowered.com/account/redeemwalletcode',
+  'roblox': 'roblox.com/redeem',
+  'epic-games': 'epicgames.com/redeem',
+  'netflix': 'netflix.com/redeem',
+  'spotify': 'spotify.com/redeem',
+  'itunes': 'apple.com/redeem',
+  'disney-plus': 'disneyplus.com/redeem',
+  'hulu': 'hulu.com/gift',
+  'amazon-prime': 'amazon.com/gc/redeem',
+  'apple': 'apple.com/redeem',
+  'google-play': 'play.google.com/redeem',
+  'microsoft': 'redeem.microsoft.com',
+  'amazon': 'amazon.com/gc/redeem',
+  'walmart': 'walmart.com/giftcard',
+  'target': 'target.com/gift-cards',
+  'best-buy': 'bestbuy.com/giftcards',
+  'ebay': 'ebay.com/giftcard',
+  'starbucks': 'starbucks.com/gift',
+  'mcdonalds': 'mcdonalds.com/us/en-us/mymcdonalds.html',
+  'dominos': 'dominos.com/giftcard',
+  'uber-eats': 'uber.com/gift',
+  'doordash': 'doordash.com/gift',
+};
+
 /// Gift Cards Data
 /// Comprehensive list of popular gift cards
 class GiftCardsData {
+  /// Get redemption URL for a card ID
+  static String? getRedemptionUrl(String cardId) {
+    return _redemptionUrls[cardId.toLowerCase()];
+  }
+
+  /// Get redemption instructions for a card ID
+  static String getRedemptionInstructions(String cardId, String cardName) {
+    final url = _redemptionUrls[cardId.toLowerCase()];
+    if (url != null) {
+      return 'Redeem at $url';
+    }
+    return 'Visit the official $cardName website to redeem your code.';
+  }
+
   static List<GiftCard> getAllGiftCards() {
     return [
       // Games
@@ -13,6 +56,7 @@ class GiftCardsData {
         category: GiftCardCategory.games,
         cardColor: const Color(0xFFE60012), // Nintendo Red
         logoText: 'Nintendo',
+        redemptionUrl: _redemptionUrls['nintendo'],
       ),
       GiftCard(
         id: 'playstation',
@@ -252,4 +296,3 @@ class GiftCardsData {
     ];
   }
 }
-

@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/theme/app_colors.dart';
+
+import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../providers/auth_controller_provider.dart';
 import 'login_screen.dart';
@@ -85,7 +87,9 @@ class _EmailVerificationScreenState
     if (state.hasError) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.error.toString())),
+        SnackBar(
+            content: Text(
+                ErrorHandlerUtils.getUserFriendlyErrorMessage(state.error))),
       );
     } else {
       if (!mounted) return;

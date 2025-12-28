@@ -46,7 +46,7 @@ class CoinCapService {
         _apiKey!.isNotEmpty &&
         _apiKey != 'YOUR_COINCAP_API_KEY_HERE') {
       headers['Authorization'] = 'Bearer $_apiKey';
-      debugPrint('🔑 CoinCap: Using API key for authenticated requests');
+      // Debug removed
     } else {
       debugPrint(
         '⚠️  CoinCap: No API key found, using free tier (limited requests)',
@@ -63,9 +63,9 @@ class CoinCapService {
       final coinIds = _coinIds.values.join(',');
       final url = Uri.parse('$_baseUrl/assets?ids=$coinIds');
 
-      debugPrint('🌐 CoinCap API: Requesting market data from: $url');
+      // Debug removed
       final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinCap API: Response status: ${response.statusCode}');
+      // Debug removed
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
@@ -127,12 +127,12 @@ class CoinCapService {
         );
         return marketData;
       } else {
-        debugPrint('❌ CoinCap API: Failed with status ${response.statusCode}');
-        debugPrint('📄 Response body: ${response.body}');
+        // Debug removed
+        // Debug removed
         throw Exception('Failed to load market data: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ CoinCap API: Exception in getMarketData: $e');
+      // Debug removed
       throw Exception('Error fetching market data: $e');
     }
   }
@@ -151,7 +151,7 @@ class CoinCapService {
         '🌐 CoinCap API: Requesting coin details for $symbol from: $url',
       );
       final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinCap API: Response status: ${response.statusCode}');
+      // Debug removed
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
@@ -228,7 +228,7 @@ class CoinCapService {
         '🌐 CoinCap API: Requesting historical data for $symbol from: $url',
       );
       final response = await http.get(url, headers: _getHeaders());
-      debugPrint('📡 CoinCap API: Response status: ${response.statusCode}');
+      // Debug removed
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
@@ -251,14 +251,14 @@ class CoinCapService {
         );
         return pricePoints;
       } else {
-        debugPrint('❌ CoinCap API: Failed with status ${response.statusCode}');
-        debugPrint('📄 Response body: ${response.body}');
+        // Debug removed
+        // Debug removed
         throw Exception(
           'Failed to load historical data: ${response.statusCode}',
         );
       }
     } catch (e) {
-      debugPrint('❌ CoinCap API: Exception in getHistoricalData: $e');
+      // Debug removed
       throw Exception('Error fetching historical data: $e');
     }
   }

@@ -82,7 +82,7 @@ dev_dependencies:
 
 flutter_native_splash:
   color: "#141414"
-  # image: assets/images/logo.png # Commented out to prevent cropping. We handle this in Flutter now.
+  image: assets/images/logo.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -10,6 +10,8 @@ import 'package:mayor_exchange/core/widgets/rocket_loader.dart';
 import 'package:mayor_exchange/features/transactions/models/transaction.dart';
 import 'package:mayor_exchange/features/transactions/providers/transaction_service.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../giftcards/models/gift_card.dart';
+import '../../giftcards/data/gift_cards_data.dart';
 
 class BuyerTransactionStatusScreen extends ConsumerStatefulWidget {
   final String transactionId;
@@ -178,7 +180,7 @@ class _BuyerTransactionStatusScreenState
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primaryOrange.withOpacity(0.1),
+              color: AppColors.primaryOrange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.shopping_bag_outlined,
@@ -189,7 +191,7 @@ class _BuyerTransactionStatusScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${transaction.type.name.toUpperCase().replaceAll('_', ' ')}',
+                transaction.type.name.toUpperCase().replaceAll('_', ' '),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -324,8 +326,24 @@ class _BuyerTransactionStatusScreenState
         final isBuyGiftCard = transaction.type == TransactionType.buyGiftCard ||
             transaction.type == TransactionType.buyCrypto;
         final giftCardInfo = transaction.details['gift_card_info'];
+        final cardId = transaction.details['card_id'] as String?;
+        final cardName = transaction.details['card_name'] as String? ??
+            transaction.currencyPair.split('/').first;
 
         if (isBuyGiftCard && giftCardInfo != null) {
+          // Get the gift card data for branding
+          GiftCard? giftCard;
+          if (cardId != null) {
+            try {
+              giftCard = GiftCardsData.getAllGiftCards().firstWhere(
+                (gc) => gc.id.toLowerCase() == cardId.toLowerCase(),
+              );
+            } catch (_) {}
+          }
+
+          final redemptionUrl =
+              cardId != null ? GiftCardsData.getRedemptionUrl(cardId) : null;
+
           return Column(
             children: [
               _buildStatusCard(
@@ -335,36 +353,176 @@ class _BuyerTransactionStatusScreenState
                 description: 'Your purchase is complete!',
               ),
               const SizedBox(height: 24),
+
+              // Brand header with logo
+              if (giftCard != null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: giftCard.cardColor.withValues(alpha: 0.15),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(16)),
+                    border: Border.all(
+                        color: giftCard.cardColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      // Brand Logo
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: giftCard.cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: giftCard.icon != null
+                              ? Icon(giftCard.icon,
+                                  color: Colors.white, size: 28)
+                              : Text(
+                                  giftCard.logoText
+                                          ?.substring(0, 1)
+                                          .toUpperCase() ??
+                                      '?',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cardName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '\$${transaction.amountCrypto?.toStringAsFixed(0) ?? '0'} Gift Card',
+                              style: TextStyle(
+                                color: giftCard.cardColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Gift Card Code Section
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: giftCard != null
+                      ? const BorderRadius.vertical(bottom: Radius.circular(16))
+                      : BorderRadius.circular(16),
                   border: Border.all(color: Colors.green),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Your Gift Card Code:',
-                        style: AppTextStyles.titleMedium(context)
-                            .copyWith(color: Colors.green)),
+                    Row(
+                      children: [
+                        const Icon(Icons.confirmation_number,
+                            color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Your Gift Card Code:',
+                            style: AppTextStyles.titleMedium(context)
+                                .copyWith(color: Colors.green)),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: SelectableText(
-                        giftCardInfo,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.bold),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: SelectableText(
+                              giftCardInfo,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  letterSpacing: 2,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.copy, color: Colors.green),
+                            onPressed: () => _copyToClipboard(giftCardInfo),
+                            tooltip: 'Copy code',
+                          ),
+                        ],
                       ),
                     ),
+
+                    // Redemption Instructions
+                    if (redemptionUrl != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: Colors.blue.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link,
+                                color: Colors.blue, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'How to redeem:',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SelectableText(
+                                    redemptionUrl,
+                                    style: TextStyle(
+                                      color: Colors.blue[300],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy,
+                                  color: Colors.blue, size: 18),
+                              onPressed: () => _copyToClipboard(redemptionUrl),
+                              tooltip: 'Copy URL',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -429,9 +587,9 @@ class _BuyerTransactionStatusScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

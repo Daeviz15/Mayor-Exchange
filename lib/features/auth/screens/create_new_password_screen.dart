@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
+
+import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../providers/forgot_password_controller.dart';
 import 'login_screen.dart';
@@ -62,7 +64,9 @@ class _CreateNewPasswordScreenState
     final state = ref.read(forgotPasswordControllerProvider);
     if (state.hasError) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.error.toString())),
+        SnackBar(
+            content: Text(
+                ErrorHandlerUtils.getUserFriendlyErrorMessage(state.error))),
       );
     } else {
       // Success, maybe go to login or home

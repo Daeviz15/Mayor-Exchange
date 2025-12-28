@@ -6,6 +6,8 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../providers/wallet_provider.dart';
 import '../../dasboard/providers/balance_provider.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../transactions/services/forex_service.dart';
 
 class WithdrawalScreen extends ConsumerStatefulWidget {
   const WithdrawalScreen({super.key});
@@ -32,13 +34,13 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     super.dispose();
   }
 
-  Future<void> _submitWithdrawal() async {
+  Future<void> _submitWithdrawal(
+      double convertedBalance, String currency, ForexService forex) async {
     if (!_formKey.currentState!.validate()) return;
 
-    final balanceState = ref.read(balanceProvider);
-    final amount = double.tryParse(_amountController.text) ?? 0;
+    final amountEntered = double.tryParse(_amountController.text) ?? 0;
 
-    if (amount > balanceState.totalBalance) {
+    if (amountEntered > convertedBalance) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Insufficient balance'),
@@ -51,9 +53,12 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Convert Foreign Currency back to NGN for the backend wallet logic
+      final amountInNgn = forex.convertToNgn(amountEntered, currency);
+
       // Implement withdrawal logic via provider
       await ref.read(walletProvider.notifier).requestWithdrawal(
-            amount: amount,
+            amount: amountInNgn,
             bankName: _bankNameController.text,
             accountNumber: _accountNumberController.text,
             accountName: _accountNameController.text,
@@ -85,6 +90,15 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
   @override
   Widget build(BuildContext context) {
     final balanceState = ref.watch(balanceProvider);
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.asData?.value;
+    final currency = user?.currency ?? 'NGN';
+    final forexService = ref.watch(forexServiceProvider);
+
+    // Convert Total Balance (NGN) to User Currency
+    final convertedBalance =
+        forexService.convert(balanceState.totalBalance, currency);
+    final symbol = _getSymbol(currency);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -121,7 +135,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                             style: AppTextStyles.bodySmall(context)),
                         const SizedBox(height: 8),
                         Text(
-                          '\$${balanceState.totalBalance.toStringAsFixed(2)}',
+                          '$symbol${convertedBalance.toStringAsFixed(2)}',
                           style: AppTextStyles.headlineMedium(context).copyWith(
                             color: AppColors.primaryOrange,
                             fontWeight: FontWeight.bold,
@@ -144,7 +158,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
               TextFormField(
                 controller: _bankNameController,
                 style: AppTextStyles.bodyMedium(context),
-                decoration: _inputDecoration('Bank Name', context),
+                decoration: _inputDecoration('Bank Name'),
                 validator: (v) =>
                     v?.isEmpty == true ? 'Please enter bank name' : null,
               ),
@@ -156,7 +170,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                 style: AppTextStyles.bodyMedium(context),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: _inputDecoration('Account Number', context),
+                decoration: _inputDecoration('Account Number'),
                 validator: (v) =>
                     v?.isEmpty == true ? 'Please enter account number' : null,
               ),
@@ -166,7 +180,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
               TextFormField(
                 controller: _accountNameController,
                 style: AppTextStyles.bodyMedium(context),
-                decoration: _inputDecoration('Account Name', context),
+                decoration: _inputDecoration('Account Name'),
                 validator: (v) =>
                     v?.isEmpty == true ? 'Please enter account name' : null,
               ),
@@ -183,15 +197,15 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                 style: AppTextStyles.bodyMedium(context),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: _inputDecoration('Amount (USD)', context).copyWith(
-                  prefixText: '\$ ',
+                decoration: _inputDecoration('Amount ($currency)').copyWith(
+                  prefixText: '$symbol ',
                   prefixStyle: AppTextStyles.bodyMedium(context),
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Enter amount';
                   final val = double.tryParse(v);
                   if (val == null || val <= 0) return 'Invalid amount';
-                  if (val > balanceState.totalBalance) {
+                  if (val > convertedBalance) {
                     return 'Insufficient balance';
                   }
                   return null;
@@ -203,7 +217,8 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
               CustomButton(
                 text: 'Process Withdrawal',
                 isLoading: _isLoading,
-                onPressed: _submitWithdrawal,
+                onPressed: () =>
+                    _submitWithdrawal(convertedBalance, currency, forexService),
               ),
             ],
           ),
@@ -212,7 +227,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String label, BuildContext context) {
+  InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: AppColors.textSecondary),
@@ -231,5 +246,22 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
         borderSide: const BorderSide(color: AppColors.primaryOrange),
       ),
     );
+  }
+
+  String _getSymbol(String currency) {
+    switch (currency) {
+      case 'USD':
+        return '\$';
+      case 'GBP':
+        return '£';
+      case 'EUR':
+        return '€';
+      case 'CAD':
+        return 'C\$';
+      case 'GHS':
+        return '₵';
+      default:
+        return '₦';
+    }
   }
 }

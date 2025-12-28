@@ -7,6 +7,9 @@ import 'package:pinput/pinput.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/rocket_loader.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/error_handler_utils.dart';
+
 import '../providers/forgot_password_controller.dart';
 import 'create_new_password_screen.dart';
 
@@ -189,14 +192,24 @@ class _VerifyResetCodeScreenState extends ConsumerState<VerifyResetCodeScreen> {
                           size: 24,
                           color: Colors.white,
                         )
-                      : Text(
-                          'Continue',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                      : state.hasError
+                          ? Text(
+                              ErrorHandlerUtils.getUserFriendlyErrorMessage(
+                                  state.error),
+                              style: AppTextStyles.bodySmall(context).copyWith(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            )
+                          : Text(
+                              'Continue',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                 ),
               ),
               const SizedBox(height: 24),

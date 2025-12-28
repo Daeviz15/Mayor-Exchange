@@ -87,8 +87,8 @@ class UnreadNotificationNotifier extends Notifier<List<NotificationModel>> {
           (response as List).map((e) => NotificationModel.fromJson(e)).toList();
 
       state = notifications;
-    } catch (e) {
-      print('Error fetching notifications: $e');
+    } catch (_) {
+      // Silently handle notification fetch errors
     }
   }
 
@@ -110,8 +110,8 @@ class UnreadNotificationNotifier extends Notifier<List<NotificationModel>> {
               final newNotification =
                   NotificationModel.fromJson(payload.newRecord);
               state = [newNotification, ...state];
-            } catch (e) {
-              print('Error parsing notification payload: $e');
+            } catch (_) {
+              // Silently handle parse errors
             }
           },
         )
@@ -141,8 +141,8 @@ class UnreadNotificationNotifier extends Notifier<List<NotificationModel>> {
       await client
           .from('notifications')
           .update({'is_read': true}).eq('id', notificationId);
-    } catch (e) {
-      print('Error marking as read: $e');
+    } catch (_) {
+      // Silently handle mark as read errors
     }
   }
 
@@ -169,8 +169,8 @@ class UnreadNotificationNotifier extends Notifier<List<NotificationModel>> {
       await client
           .from('notifications')
           .update({'is_read': true}).eq('user_id', user.id);
-    } catch (e) {
-      print('Error marking all as read: $e');
+    } catch (_) {
+      // Silently handle mark all as read errors
     }
   }
 

@@ -6,7 +6,10 @@ import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/screens/transaction_history_screen.dart';
 import '../../transactions/screens/buyer_transaction_status_screen.dart';
+import '../../transactions/services/forex_service.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../../core/widgets/animations/fade_in_slide.dart';
+import 'transaction_card_skeleton.dart';
 
 class TransactionShortList extends ConsumerWidget {
   const TransactionShortList({super.key});
@@ -14,6 +17,10 @@ class TransactionShortList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transactionsAsync = ref.watch(userTransactionsProvider);
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.asData?.value;
+    final currency = user?.currency ?? 'NGN';
+    final forexService = ref.read(forexServiceProvider);
 
     return Column(
       children: [
@@ -88,18 +95,17 @@ class TransactionShortList extends ConsumerWidget {
                         );
                       }
                     },
-                    child: _CompactTransactionCard(transaction: transaction),
+                    child: _CompactTransactionCard(
+                      transaction: transaction,
+                      userCurrency: currency,
+                      forexService: forexService,
+                    ),
                   ),
                 );
               },
             );
           },
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20.0),
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
+          loading: () => const TransactionCardSkeletonList(count: 3),
           error: (_, __) => const SizedBox.shrink(),
         ),
       ],
@@ -109,13 +115,20 @@ class TransactionShortList extends ConsumerWidget {
 
 class _CompactTransactionCard extends StatelessWidget {
   final TransactionModel transaction;
+  final String userCurrency;
+  final ForexService forexService;
 
-  const _CompactTransactionCard({required this.transaction});
+  const _CompactTransactionCard({
+    required this.transaction,
+    required this.userCurrency,
+    required this.forexService,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isBuy = transaction.type == TransactionType.buyCrypto ||
-        transaction.type == TransactionType.buyGiftCard ||
+    // Determine if this is a Credit (Inflow) or Debit (Outflow) from Fiat Wallet perspective
+    final isCredit = transaction.type == TransactionType.sellCrypto ||
+        transaction.type == TransactionType.sellGiftCard ||
         transaction.type == TransactionType.deposit;
 
     // Determine icon based on type
@@ -128,9 +141,15 @@ class _CompactTransactionCard extends StatelessWidget {
       iconData = Icons.card_giftcard;
       iconColor = Colors.purple; // Differentiation for gift cards
     } else {
-      iconData = isBuy ? Icons.arrow_downward : Icons.arrow_upward; // In/Out
-      iconColor = isBuy ? AppColors.success : AppColors.error; // Green/Red
+      iconData = isCredit ? Icons.arrow_downward : Icons.arrow_upward; // In/Out
+      iconColor = isCredit ? AppColors.success : AppColors.error; // Green/Red
     }
+
+    // Currency Conversion
+    // Assuming transaction.amountFiat is in NGN (Base)
+    final convertAmount =
+        forexService.convert(transaction.amountFiat, userCurrency);
+    final String symbol = _getSymbol(userCurrency);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -182,10 +201,10 @@ class _CompactTransactionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isBuy ? '+' : '-'}${transaction.details['currency_symbol'] ?? '\$'}${transaction.amountFiat}',
+                '${isCredit ? '+' : '-'}$symbol${convertAmount.toStringAsFixed(2)}',
                 style: AppTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isBuy
+                  color: isCredit
                       ? AppColors.success
                       : AppColors.textPrimary, // Highlight inflow
                 ),
@@ -204,6 +223,23 @@ class _CompactTransactionCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getSymbol(String currency) {
+    switch (currency) {
+      case 'USD':
+        return '\$';
+      case 'GBP':
+        return '£';
+      case 'EUR':
+        return '€';
+      case 'CAD':
+        return 'C\$';
+      case 'GHS':
+        return '₵';
+      default:
+        return '₦';
+    }
   }
 
   String _getTitle(TransactionModel t) {

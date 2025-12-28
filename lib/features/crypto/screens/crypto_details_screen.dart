@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/error_handler_utils.dart';
 import '../providers/crypto_providers.dart';
 import '../widgets/price_chart_widget.dart';
 import '../widgets/crypto_data_card.dart';
 import '../widgets/crypto_details_skeleton.dart';
 import '../../transactions/screens/buy_sell_crypto_screen.dart';
 import '../../transactions/models/transaction.dart';
-import '../../dasboard/widgets/bottom_nav_bar.dart';
-import '../../dasboard/screens/home_screen.dart';
 import '../../dasboard/screens/settings_screen.dart';
-import '../../giftcards/screens/gift_cards_screen.dart';
 
 /// Crypto Details Screen
 /// Detailed view and trading interface for a cryptocurrency
@@ -30,7 +28,6 @@ class CryptoDetailsScreen extends ConsumerStatefulWidget {
 
 class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
   bool _isBuyOrder = true;
-  int _currentNavIndex = 2; // Trade tab
 
   @override
   Widget build(BuildContext context) {
@@ -54,25 +51,45 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Crypto Pair Selector
-                      GestureDetector(
-                        onTap: () {
-                          // Show crypto pair selector
-                        },
-                        child: Row(
-                          children: [
-                            Text(
-                              cryptoDetails.pair,
-                              style: AppTextStyles.titleLarge(context),
+                      // Back Button & Pair Selector
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundCard,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back,
+                                color: AppColors.textPrimary,
+                                size: 20,
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: AppColors.textSecondary,
-                              size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () {
+                              // Show crypto pair selector
+                            },
+                            child: Row(
+                              children: [
+                                Text(
+                                  cryptoDetails.pair,
+                                  style: AppTextStyles.titleLarge(context),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: AppColors.textSecondary,
+                                  size: 20,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       // Profile Icon
                       GestureDetector(
@@ -291,44 +308,6 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
               ],
             ),
           ),
-
-          // Bottom Navigation
-          bottomNavigationBar: AppBottomNavBar(
-            currentIndex: _currentNavIndex,
-            onTap: (index) {
-              setState(() {
-                _currentNavIndex = index;
-              });
-
-              // Handle navigation
-              if (index == 0) {
-                // Home tab
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
-              } else if (index == 3) {
-                // Gift Cards tab
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GiftCardsScreen(),
-                  ),
-                );
-              } else if (index == 4) {
-                // Settings tab
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const SettingsScreen()),
-                ).then((_) {
-                  setState(() {
-                    _currentNavIndex = 2;
-                  });
-                });
-              }
-            },
-          ),
         );
       },
       loading: () => const CryptoDetailsSkeleton(),
@@ -350,8 +329,9 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                error.toString(),
-                style: AppTextStyles.bodySmall(context),
+                ErrorHandlerUtils.getUserFriendlyErrorMessage(error),
+                style: AppTextStyles.bodySmall(context)
+                    .copyWith(color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),

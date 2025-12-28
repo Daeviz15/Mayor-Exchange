@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
+
 import '../providers/forgot_password_controller.dart';
 import 'verify_reset_code_screen.dart';
 
@@ -114,6 +117,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'example@gmail.com',
+                        errorText: state.hasError
+                            ? ErrorHandlerUtils.getUserFriendlyErrorMessage(
+                                state.error)
+                            : null,
+                        errorStyle: AppTextStyles.bodySmall(context)
+                            .copyWith(color: AppColors.error),
                         hintStyle: TextStyle(color: AppColors.textTertiary),
                         filled: true,
                         fillColor: AppColors.backgroundCard,

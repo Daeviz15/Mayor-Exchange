@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../auth/providers/profile_avatar_provider.dart';
@@ -195,7 +196,8 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('Failed to update picture: $e'),
+            content: Text(
+                'Failed to update picture: ${ErrorHandlerUtils.getUserFriendlyErrorMessage(e)}'),
             backgroundColor: AppColors.error),
       );
     }
@@ -267,7 +269,9 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
               onPrimary: Colors.white,
               surface: AppColors.backgroundCard,
               onSurface: Colors.white,
-            ), dialogTheme: DialogThemeData(backgroundColor: AppColors.backgroundCard),
+            ),
+            dialogTheme:
+                DialogThemeData(backgroundColor: AppColors.backgroundCard),
           ),
           child: child!,
         );
@@ -302,7 +306,7 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error updating profile: $e'),
+              content: Text(ErrorHandlerUtils.getUserFriendlyErrorMessage(e)),
               backgroundColor: AppColors.error),
         );
       } finally {
