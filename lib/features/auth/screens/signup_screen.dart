@@ -168,7 +168,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen>
 
       final authState = ref.read(authControllerProvider);
       if (authState.hasValue && authState.value != null) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => EmailVerificationScreen(email: email),
           ),

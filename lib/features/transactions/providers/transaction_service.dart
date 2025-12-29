@@ -214,6 +214,24 @@ class TransactionService {
 
     await _repository.claimTransaction(transactionId, _currentUser!.id);
 
+    // Snapshot admin name
+    final adminName = _currentUser!.fullName ?? 'Admin Agent';
+
+    // RE-IMPLEMENTATION OF CLAIM:
+    final tx = await _supabaseClient
+        .from('transactions')
+        .select('details')
+        .eq('id', transactionId)
+        .single();
+    final currentDetails = Map<String, dynamic>.from(tx['details'] ?? {});
+    currentDetails['admin_name'] = adminName;
+
+    await _repository.updateStatus(
+        transactionId: transactionId,
+        newStatus: TransactionStatus.claimed,
+        adminId: _currentUser!.id,
+        details: currentDetails);
+
     await _repository.createLog(
       transactionId: transactionId,
       actorId: _currentUser!.id,
@@ -257,6 +275,7 @@ class TransactionService {
         .single();
     final currentDetails = Map<String, dynamic>.from(tx['details']);
     final newDetails = {...currentDetails, 'admin_bank_details': bankDetails};
+    newDetails['admin_name'] = _currentUser!.fullName ?? 'Admin Agent';
 
     // Update Transaction
     await _supabaseClient.from('transactions').update({
@@ -352,6 +371,45 @@ class TransactionService {
       }
     }
 
+    // Auto-snapshot admin name if we are setting adminId (implying admin action)
+    // or if the actor has a role (but we strictly know _currentUser is the actor here).
+    // If details are being updated and we are an admin, ensure name is fresh.
+    if (newStatus != TransactionStatus.pending &&
+        newStatus !=
+            TransactionStatus.verificationPending && // User triggers this
+        newStatus != TransactionStatus.cancelled) {
+      // This is likely an admin action (completed, rejected, paymentPending etc)
+      if (effectiveDetails == null) {
+        // Need to fetch details to add name if not present
+        final tx = await _supabaseClient
+            .from('transactions')
+            .select('details')
+            .eq('id', transactionId)
+            .maybeSingle();
+        if (tx != null) {
+          effectiveDetails = Map<String, dynamic>.from(tx['details'] ?? {});
+        } else {
+          effectiveDetails = {};
+        }
+      }
+      effectiveDetails['admin_name'] = _currentUser!.fullName ?? 'Admin Agent';
+    }
+
+    // Save note to details so it is visible to user
+    if (note != null && note.isNotEmpty) {
+      if (effectiveDetails == null) {
+        // Fetch details if we haven't already
+        final tx = await _supabaseClient
+            .from('transactions')
+            .select('details')
+            .eq('id', transactionId)
+            .maybeSingle();
+        effectiveDetails =
+            tx != null ? Map<String, dynamic>.from(tx['details'] ?? {}) : {};
+      }
+      effectiveDetails['note'] = note;
+    }
+
     await _repository.updateStatus(
       transactionId: transactionId,
       newStatus: newStatus,
@@ -389,6 +447,24 @@ class TransactionService {
       type: 'transaction',
       relatedId: transactionId,
     );
+  }
+
+  /// Fetch rejection/cancellation reason from logs (Fallback)
+  Future<String?> getRejectionReason(String transactionId) async {
+    try {
+      final logs = await _repository.getTransactionLogs(transactionId);
+      for (final log in logs) {
+        if ((log.newStatus == TransactionStatus.rejected ||
+                log.newStatus == TransactionStatus.cancelled) &&
+            log.note != null &&
+            log.note!.isNotEmpty) {
+          return log.note;
+        }
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<void> _createNotification({

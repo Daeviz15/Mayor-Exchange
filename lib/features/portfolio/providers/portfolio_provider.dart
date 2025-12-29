@@ -63,42 +63,37 @@ final portfolioProvider = Provider<PortfolioState>((ref) {
       continue;
     }
 
-    // For non-withdrawals, we generally only count completed transactions for balance
-    // But for withdrawals, we want to deduct pending ones too.
-    if (t.type != TransactionType.withdrawal &&
-        t.status != TransactionStatus.completed) {
-      continue;
-    }
-
+    // Explicit status checks inside switch to avoid boolean logic errors
     switch (t.type) {
       case TransactionType.deposit:
-        fiatBalance += t.amountFiat;
+        // Only count COMPLETED deposits
+        if (t.status == TransactionStatus.completed) {
+          fiatBalance += t.amountFiat;
+        }
         break;
       case TransactionType.withdrawal:
-        // Deduct if completed OR pending (lock funds)
-        if (t.status == TransactionStatus.completed ||
-            t.status == TransactionStatus.pending ||
-            t.status == TransactionStatus.paymentPending ||
-            t.status == TransactionStatus.verificationPending) {
+        // Deduct ONLY if COMPLETED
+        if (t.status == TransactionStatus.completed) {
           fiatBalance -= t.amountFiat;
         }
         break;
       case TransactionType.buyCrypto:
-        // BUY CRYPTO: User pays admin directly (external payment)
-        // NO fiat balance change - user receives crypto at their external wallet
-        // We also don't track crypto holdings here since crypto goes to external wallet
+        // User pays externally. No wallet impact.
         break;
       case TransactionType.sellCrypto:
-        // SELL CRYPTO: Admin credits user's fiat wallet
-        fiatBalance += t.amountFiat;
+        // Admin credits user. Only on COMPLETED.
+        if (t.status == TransactionStatus.completed) {
+          fiatBalance += t.amountFiat;
+        }
         break;
       case TransactionType.buyGiftCard:
-        // BUY GIFT CARD: User pays admin directly (external payment)
-        // NO fiat balance change - user receives gift card code
+        // User pays externally. No wallet impact.
         break;
       case TransactionType.sellGiftCard:
-        // SELL GIFT CARD: Admin credits user's fiat wallet
-        fiatBalance += t.amountFiat;
+        // Admin credits user. Only on COMPLETED.
+        if (t.status == TransactionStatus.completed) {
+          fiatBalance += t.amountFiat;
+        }
         break;
     }
   }

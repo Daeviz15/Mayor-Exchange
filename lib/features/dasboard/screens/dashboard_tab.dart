@@ -23,15 +23,14 @@ import '../../../core/widgets/animations/fade_in_slide.dart';
 import '../../../core/widgets/animations/page_transitions.dart';
 import '../../portfolio/screens/portfolio_screen.dart';
 import '../../wallet/screens/withdrawal_screen.dart';
-import '../widgets/country_selection_modal.dart';
 import '../../transactions/services/forex_service.dart';
 import '../../giftcards/providers/gift_cards_providers.dart';
-import '../../giftcards/providers/giftcard_rates_provider.dart';
+
 import '../../transactions/providers/transaction_service.dart';
 import '../../../core/providers/navigation_provider.dart';
 import '../widgets/transaction_short_list.dart';
-import '../widgets/giftcard_skeleton.dart';
-import '../../giftcards/screens/buy_sell_giftcard_screen.dart';
+
+import '../../giftcards/screens/sell_giftcard_screen.dart';
 
 class DashboardTab extends ConsumerStatefulWidget {
   const DashboardTab({super.key});
@@ -41,7 +40,6 @@ class DashboardTab extends ConsumerStatefulWidget {
 }
 
 class _DashboardTabState extends ConsumerState<DashboardTab> {
-  bool _hasCheckedCountry = false;
   int _selectedTabIndex = 0; // 0: Cryptocurrency, 1: Gift Cards
 
   final Set<String> _processedNotificationIds = {};
@@ -63,20 +61,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
     final localAvatarPath = avatarState.localPath;
     final networkAvatarUrl = avatarState.storageUrl ?? user?.avatarUrl;
 
-    // Check if country is set
-    if (user != null && user.country == null && !_hasCheckedCountry) {
-      _hasCheckedCountry = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        showModalBottomSheet(
-          context: context,
-          isDismissible: false,
-          enableDrag: false,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => const CountrySelectionModal(),
-        ).then((_) {});
-      });
-    }
+    // Country defaults to Nigeria - no selection modal needed
 
     // Listen for new notifications
     ref.listen(notificationsProvider, (previous, next) {
@@ -157,7 +142,8 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
                       duration: const Duration(milliseconds: 800),
                       delay: const Duration(milliseconds: 100),
                       child: Builder(builder: (context) {
-                        final currency = user?.currency ?? 'NGN';
+                        const currency =
+                            'NGN'; // Hardcoded - v2.0 will add country selection
                         String symbol = '₦';
 
                         final forexService = ref.read(forexServiceProvider);
@@ -392,177 +378,147 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
                           // Gift Cards Grid with Real Rates
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Builder(builder: (context) {
-                              final ratesAsync =
-                                  ref.watch(giftCardRatesProvider);
-                              final userProfile = ref
-                                  .watch(authControllerProvider)
-                                  .asData
-                                  ?.value;
-                              final userCurrency =
-                                  userProfile?.currency ?? 'NGN';
-                              final forexService =
-                                  ref.read(forexServiceProvider);
+                            child: Builder(
+                              builder: (context) {
+                                final userProfile = ref
+                                    .watch(authControllerProvider)
+                                    .asData
+                                    ?.value;
+                                final userCurrency =
+                                    userProfile?.currency ?? 'NGN';
+                                final forexService =
+                                    ref.read(forexServiceProvider);
+                                const currencySymbols = {
+                                  'NGN': '₦',
+                                  'USD': '\$',
+                                  'EUR': '€',
+                                  'GBP': '£',
+                                  'CAD': 'C\$',
+                                  'AUD': 'A\$',
+                                };
+                                final currencySymbol =
+                                    currencySymbols[userCurrency] ??
+                                        userCurrency;
 
-                              // Currency symbol map
-                              const currencySymbols = {
-                                'NGN': '₦',
-                                'USD': '\$',
-                                'EUR': '€',
-                                'GBP': '£',
-                                'CAD': 'C\$',
-                                'AUD': 'A\$',
-                              };
-                              final currencySymbol =
-                                  currencySymbols[userCurrency] ?? userCurrency;
+                                final activeCardsWithRates = allGiftCards
+                                    .where((c) => c.buyRate > 0)
+                                    .take(4)
+                                    .toList();
 
-                              return ratesAsync.when(
-                                data: (rates) {
-                                  // Get active rates and match with gift cards
-                                  final activeRates =
-                                      rates.where((r) => r.isActive).toList();
-                                  if (activeRates.isEmpty) {
-                                    return const Center(
-                                      child: Text('No gift cards available',
-                                          style: TextStyle(
-                                              color: AppColors.textSecondary)),
-                                    );
-                                  }
+                                if (activeCardsWithRates.isEmpty) {
+                                  return const Center(
+                                    child: Text('No gift cards available',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary)),
+                                  );
+                                }
 
-                                  // Take top 4 active rates
-                                  final displayRates =
-                                      activeRates.take(4).toList();
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 1.5,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                  ),
+                                  itemCount: activeCardsWithRates.length,
+                                  itemBuilder: (context, index) {
+                                    final card = activeCardsWithRates[index];
+                                    // Convert rate to user's currency
+                                    // buyRate is platform BUYING from user (User Selling)
+                                    final convertedRate = userCurrency == 'NGN'
+                                        ? card.buyRate
+                                        : forexService.convert(
+                                            card.buyRate, userCurrency);
 
-                                  return GridView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      childAspectRatio: 1.5,
-                                      crossAxisSpacing: 12,
-                                      mainAxisSpacing: 12,
-                                    ),
-                                    itemCount: displayRates.length,
-                                    itemBuilder: (context, index) {
-                                      final rate = displayRates[index];
-                                      // Find matching gift card for color/icon
-                                      final matchingCard =
-                                          allGiftCards.firstWhere(
-                                        (c) =>
-                                            c.id.toLowerCase() ==
-                                            rate.cardId.toLowerCase(),
-                                        orElse: () => allGiftCards.first,
-                                      );
-
-                                      // Convert rate to user's currency
-                                      final convertedRate =
-                                          userCurrency == 'NGN'
-                                              ? rate.sellRate
-                                              : forexService.convert(
-                                                  rate.sellRate, userCurrency);
-
-                                      return GestureDetector(
-                                        onTap: () {
-                                          // Navigate to buy/sell screen for this card
-                                          Navigator.push(
-                                            context,
-                                            SlidePageRoute(
-                                              page: BuySellGiftCardScreen(
-                                                giftCard: matchingCard,
-                                                isBuy:
-                                                    false, // Default to Sell tab
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: AppColors.backgroundCard,
-                                            borderRadius:
-                                                BorderRadius.circular(16),
-                                            border: Border.all(
-                                              color: matchingCard.cardColor
-                                                  .withValues(alpha: 0.3),
-                                              width: 1,
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // Navigate to sell screen for this card
+                                        Navigator.push(
+                                          context,
+                                          SlidePageRoute(
+                                            page: SellGiftCardScreen(
+                                              giftCard: card,
                                             ),
                                           ),
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              // Card icon with brand color
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: matchingCard.cardColor
-                                                      .withValues(alpha: 0.15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: matchingCard.icon != null
-                                                    ? Icon(matchingCard.icon,
-                                                        color: matchingCard
-                                                            .cardColor,
-                                                        size: 24)
-                                                    : Text(
-                                                        matchingCard.logoText
-                                                                ?.substring(
-                                                                    0, 1)
-                                                                .toUpperCase() ??
-                                                            '?',
-                                                        style: TextStyle(
-                                                          color: matchingCard
-                                                              .cardColor,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 18,
-                                                        ),
-                                                      ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(rate.cardName,
-                                                  style:
-                                                      AppTextStyles.bodyMedium(
-                                                          context)),
-                                              const SizedBox(height: 2),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.success
-                                                      .withValues(alpha: 0.1),
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  '\$1 = $currencySymbol${convertedRate.toStringAsFixed(0)}',
-                                                  style: const TextStyle(
-                                                    color: AppColors.success,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                        );
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.backgroundCard,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: card.cardColor
+                                                .withValues(alpha: 0.3),
+                                            width: 1,
                                           ),
                                         ),
-                                      );
-                                    },
-                                  );
-                                },
-                                loading: () =>
-                                    const GiftCardSkeletonGrid(count: 4),
-                                error: (_, __) => const Center(
-                                  child: Text('Failed to load rates',
-                                      style: TextStyle(color: AppColors.error)),
-                                ),
-                              );
-                            }),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            // Card icon with brand color
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: card.cardColor
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: card.icon != null
+                                                  ? Icon(card.icon,
+                                                      color: card.cardColor,
+                                                      size: 24)
+                                                  : Text(
+                                                      card.logoText
+                                                              ?.substring(0, 1)
+                                                              .toUpperCase() ??
+                                                          '?',
+                                                      style: TextStyle(
+                                                        color: card.cardColor,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 18,
+                                                      ),
+                                                    ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(card.name,
+                                                style: AppTextStyles.bodyMedium(
+                                                    context)),
+                                            const SizedBox(height: 2),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.success
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                '\$1 = $currencySymbol${convertedRate.toStringAsFixed(0)}',
+                                                style: const TextStyle(
+                                                  color: AppColors.success,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                           ),
                       ],
                     ),

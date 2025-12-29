@@ -7,15 +7,15 @@ import '../../../core/providers/supabase_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../settings/providers/settings_provider.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../../crypto/providers/crypto_providers.dart';
+import '../services/forex_service.dart';
 import '../../dasboard/models/crypto_data.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_service.dart';
 import '../providers/rates_provider.dart';
-import '../services/forex_service.dart';
 import '../../../core/widgets/price_timestamp_widget.dart';
 import '../../../core/providers/navigation_provider.dart';
 
@@ -123,7 +123,8 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     super.dispose();
   }
 
-  double get _amountUSD {
+  // Input value is either USD (NGN in new logic) or Crypto
+  double get _inputValue {
     return double.tryParse(_amountController.text) ?? 0.0;
   }
 
@@ -137,17 +138,28 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     return 0.0;
   }
 
-  // Calculate Crypto Amount based on USD Input and Live Market Price
-  double _calculateCryptoAmount(double marketPrice) {
-    if (marketPrice <= 0) return 0.0;
-    return _amountUSD / marketPrice;
+  // Calculate Output Amount based on Input and Admin Rate
+  // BUY: Input is NGN. Output is Crypto.
+  // SELL: Input is Crypto. Output is NGN.
+  double _calculateOutputAmount(CryptoRate? rate, bool isBuy) {
+    if (rate == null) return 0.0;
+    final adminRate = isBuy ? rate.buyRate : rate.sellRate;
+    if (adminRate <= 0) return 0.0;
+
+    if (isBuy) {
+      // User pays NGN, gets Crypto
+      // Crypto = NGN / Rate
+      return _inputValue / adminRate;
+    } else {
+      // User sells Crypto, gets NGN
+      // NGN = Crypto * Rate
+      return _inputValue * adminRate;
+    }
   }
 
   // Get dynamic FX Rate (NGN/USD) from Admin Rates (using USDT as base or specific asset rate)
   CryptoRate? _getAdminRate(List<CryptoRate> rates) {
     try {
-      // 1. Try to get rate for current asset
-      // 2. Fallback to USDT rate
       final assetRate = rates.firstWhere(
         (r) => r.assetSymbol == _selectedAsset,
         orElse: () => rates.firstWhere(
@@ -162,19 +174,11 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     }
   }
 
-  double _calculateFiatAmount(
-      CryptoRate? rate, bool isBuy, double cryptoAmount) {
-    if (rate == null) return 0.0;
-    final fxRate = isBuy ? rate.buyRate : rate.sellRate;
-
-    // Admin sets rates per UNIT of the asset.
-    // e.g. BTC Buy Rate = 165,000,000 NGN.
-    // So Fiat Amount = Crypto_Amount * Admin_Rate.
-
-    return cryptoAmount * fxRate;
-  }
-
   Future<void> _pickImage() async {
+    final hasPermission =
+        await PermissionUtils.requestGalleryPermission(context);
+    if (!hasPermission) return;
+
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
@@ -195,18 +199,20 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
           .upload(fileName, _proofImage!);
       return path;
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Error uploading image: $e'),
-            backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error uploading image: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
       return null;
     }
   }
 
   bool get _isValidOrder {
     final isBuy = _tabController.index == 0;
-    final amountValid = _amountUSD > 0;
+    final amountValid = _inputValue > 0;
 
     if (isBuy) {
       // Buy only requires amount + wallet address (proof comes later after admin claims)
@@ -272,19 +278,22 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     if (!mounted) return;
 
     // Step 2: Calculate amounts with fresh price
-    final freshCryptoAmount = _calculateCryptoAmount(freshMarketPrice);
-    final freshFiatAmount =
-        _calculateFiatAmount(rate, isBuy, freshCryptoAmount);
+    final outputAmount = _calculateOutputAmount(rate, isBuy);
     final fxRateApplied = isBuy ? rate?.buyRate : rate?.sellRate;
 
     // Get currency symbol for display
-    final authState = ref.read(authControllerProvider);
-    final user = authState.asData?.value;
-    final userCurrency = user?.currency ?? 'NGN';
+    // final authState = ref.read(authControllerProvider);
+    // final user = authState.asData?.value;
+    const userCurrency = 'NGN'; // Hardcoded
     final currencySymbol = _getCurrencySymbol(userCurrency);
-    final forexService = ref.read(forexServiceProvider);
-    final fiatInUserCurrency =
-        forexService.convert(freshFiatAmount, userCurrency);
+
+    // Prepare Confirmation Values
+    final payAmountLabel = isBuy
+        ? '$currencySymbol${_inputValue.toStringAsFixed(2)}'
+        : '${_inputValue.toStringAsFixed(8)} $_selectedAsset';
+    final receiveAmountLabel = isBuy
+        ? '${outputAmount.toStringAsFixed(8)} $_selectedAsset'
+        : '$currencySymbol${outputAmount.toStringAsFixed(2)}';
 
     // Step 3: Show confirmation dialog with fresh price
     final confirmed = await showDialog<bool>(
@@ -334,17 +343,25 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
 
             // Transaction details
             _buildConfirmRow('Asset:', _selectedAsset),
-            _buildConfirmRow(
-                'Market Price:', '\$${freshMarketPrice.toStringAsFixed(2)}'),
-            _buildConfirmRow(
-                'Amount (USD):', '\$${_amountUSD.toStringAsFixed(2)}'),
-            _buildConfirmRow('Crypto Amount:',
-                '${freshCryptoAmount.toStringAsFixed(8)} $_selectedAsset'),
+            if (isBuy)
+              _buildConfirmRow('Rate:',
+                  '1 $_selectedAsset = $currencySymbol${fxRateApplied?.toStringAsFixed(2)}'),
+            if (!isBuy)
+              _buildConfirmRow('Rate:',
+                  '1 $_selectedAsset = $currencySymbol${fxRateApplied?.toStringAsFixed(2)}'),
+
             const Divider(color: AppColors.divider),
+
+            // Reordered: You Pay first
             _buildConfirmRow(
-              isBuy ? 'You Pay:' : 'You Receive:',
-              '$currencySymbol${fiatInUserCurrency.toStringAsFixed(2)}',
-              highlight: true,
+              'You Pay:',
+              payAmountLabel,
+              highlight: false, // Normal layout for pay
+            ),
+            _buildConfirmRow(
+              'You Receive:',
+              receiveAmountLabel,
+              highlight: true, // Highlight receive
             ),
 
             const SizedBox(height: 16),
@@ -417,16 +434,21 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
         if (proofPath == null) throw 'Image upload failed';
       }
 
+      // Calculate final values for DB
+      final amountFiat = isBuy ? _inputValue : outputAmount;
+      final amountCrypto = isBuy ? outputAmount : _inputValue;
+
       // Submit Transaction with fresh price data
       await ref.read(transactionServiceProvider).submitTransaction(
         type: type,
-        amountFiat: freshFiatAmount, // Use fresh calculated amount
-        amountCrypto: freshCryptoAmount, // Use fresh calculated amount
+        amountFiat: amountFiat,
+        amountCrypto: amountCrypto,
         currencyPair: '$_selectedAsset/NGN',
         proofImagePath: proofPath, // null for Buy, path for Sell
         details: {
           'asset': _selectedAsset,
-          'usd_input': _amountUSD,
+          'input_type': isBuy ? 'NGN' : 'CRYPTO',
+          'input_amount': _inputValue,
           'market_price_at_submission':
               freshMarketPrice, // Record the price used
           'fx_rate_applied': fxRateApplied,
@@ -516,9 +538,9 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
     final isBuy = _tabController.index == 0;
 
     // Get user's preferred currency
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
-    final userCurrency = user?.currency ?? 'NGN';
+    // final authState = ref.watch(authControllerProvider);
+    // final user = authState.asData?.value;
+    const userCurrency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final currencySymbol = _getCurrencySymbol(userCurrency);
     final forexService = ref.read(forexServiceProvider);
 
@@ -580,13 +602,12 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
             final currentRate = _getAdminRate(rates);
             final activeAdminRate =
                 isBuy ? currentRate?.buyRate : currentRate?.sellRate;
-            final payReceiveText = isBuy ? 'You Pay:' : 'You Receive:';
 
             // Watch crypto list for real-time market prices
             final cryptoListAsync = ref.watch(cryptoListProvider);
             final cryptoList = cryptoListAsync.asData?.value ?? [];
             final marketPrice = _getMarketPrice(cryptoList);
-            final cryptoAmount = _calculateCryptoAmount(marketPrice);
+            final outputAmount = _calculateOutputAmount(currentRate, isBuy);
 
             // Get the selected crypto for timestamp
             final selectedCrypto = cryptoList.isNotEmpty
@@ -645,60 +666,92 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
 
                   // Market Price Display (Real-time from API)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      color: AppColors.backgroundCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05)),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        _isRefreshing
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.blue,
-                                ),
-                              )
-                            : const Icon(Icons.show_chart,
-                                color: Colors.blue, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text('Market Price',
-                                      style: TextStyle(
-                                          color: Colors.blue,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500)),
-                                  const SizedBox(width: 8),
-                                  if (selectedCrypto != null)
-                                    PriceTimestampWidget(
-                                      lastUpdated: selectedCrypto.lastUpdated,
-                                      textStyle: const TextStyle(
-                                        color: Colors.blue,
-                                        fontSize: 10,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('Market Price',
+                                        style:
+                                            AppTextStyles.bodySmall(context)),
+                                    const SizedBox(width: 8),
+                                    if (_isRefreshing)
+                                      const SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
                                       ),
-                                      iconColor: Colors.blue,
-                                      showIcon: false,
+                                  ],
+                                ),
+                                if (selectedCrypto != null)
+                                  PriceTimestampWidget(
+                                    lastUpdated: selectedCrypto.lastUpdated,
+                                    textStyle: TextStyle(
+                                      color: AppColors.textTertiary,
+                                      fontSize: 10,
                                     ),
-                                ],
+                                    showIcon: false,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '\$${marketPrice.toStringAsFixed(2)}',
+                              style: AppTextStyles.titleLarge(context).copyWith(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
-                              Text(
-                                marketPrice > 0
-                                    ? '1 $_selectedAsset = \$${marketPrice.toStringAsFixed(2)}'
-                                    : 'Loading...',
-                                style: AppTextStyles.titleMedium(context)
-                                    .copyWith(color: Colors.blue),
+                            ),
+                            const SizedBox(height: 8),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '≈ $currencySymbol${forexService.convertToNgn(marketPrice, 'USD').toStringAsFixed(2)}',
+                                style: AppTextStyles.headlineMedium(context)
+                                    .copyWith(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primaryOrange,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: AppColors.divider),
+                        const SizedBox(height: 10),
+                        // Footer: Disclaimer
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 14, color: AppColors.textTertiary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Transaction fees may apply. Final rate determined at checkout.',
+                                style: TextStyle(
+                                  color: AppColors.textTertiary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -730,16 +783,11 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                                       color: AppColors.primaryOrange,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500)),
-                              Builder(builder: (context) {
-                                final rateInNgn = activeAdminRate ?? 0.0;
-                                final rateInUserCurrency = forexService.convert(
-                                    rateInNgn, userCurrency);
-                                return Text(
-                                  '1 $_selectedAsset = $currencySymbol${rateInUserCurrency.toStringAsFixed(2)}',
-                                  style: AppTextStyles.titleMedium(context)
-                                      .copyWith(color: AppColors.primaryOrange),
-                                );
-                              }),
+                              Text(
+                                '1 $_selectedAsset = $currencySymbol${activeAdminRate?.toStringAsFixed(2) ?? "0.00"}',
+                                style: AppTextStyles.titleMedium(context)
+                                    .copyWith(color: AppColors.primaryOrange),
+                              ),
                             ],
                           ),
                         ),
@@ -749,9 +797,11 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
 
                   const SizedBox(height: 24),
 
-                  // Amount Input
-                  Text('Amount (USD)',
-                      style: AppTextStyles.labelMedium(context)),
+                  // Amount Input - Dynamic Label & Icon
+                  Text(
+                    isBuy ? 'Amount (NGN)' : 'Amount ($_selectedAsset)',
+                    style: AppTextStyles.labelMedium(context),
+                  ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _amountController,
@@ -762,8 +812,20 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                     decoration: InputDecoration(
                       hintText: '0.00',
                       hintStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon: const Icon(Icons.attach_money,
-                          color: AppColors.primaryOrange), // USD Icon
+                      prefixIcon: isBuy
+                          ? const Icon(
+                              Icons.currency_exchange, // NGN Icon equivalent
+                              color: AppColors.primaryOrange)
+                          : Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                _selectedAsset.substring(
+                                    0, 1), // Simple text icon for crypto
+                                style: const TextStyle(
+                                    color: AppColors.primaryOrange,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
                       filled: true,
                       fillColor: AppColors.backgroundCard,
                       border: OutlineInputBorder(
@@ -784,37 +846,48 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                     ),
                     child: Column(
                       children: [
-                        // Crypto Equivalent
+                        // You Pay
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Crypto:',
+                            Text('You Pay:',
                                 style: AppTextStyles.bodyMedium(context)),
-                            Text(
-                                '${cryptoAmount.toStringAsFixed(6)} $_selectedAsset',
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                isBuy
+                                    ? '$currencySymbol${_inputValue.toStringAsFixed(2)}'
+                                    : '${_inputValue.toStringAsFixed(8)} $_selectedAsset',
+                                textAlign: TextAlign.end,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ],
                         ),
                         const Divider(color: Colors.white10),
-                        // Fiat Amount (Converted to User's Currency)
+                        // You Receive
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(payReceiveText,
+                            Text('You Receive:',
                                 style: AppTextStyles.bodyLarge(context)),
-                            Builder(builder: (context) {
-                              final fiatNgn = _calculateFiatAmount(
-                                  currentRate, isBuy, cryptoAmount);
-                              final fiatUserCurrency =
-                                  forexService.convert(fiatNgn, userCurrency);
-                              return Text(
-                                '$currencySymbol${fiatUserCurrency.toStringAsFixed(2)}',
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                isBuy
+                                    ? '${outputAmount.toStringAsFixed(8)} $_selectedAsset'
+                                    : '$currencySymbol${outputAmount.toStringAsFixed(2)}',
+                                textAlign: TextAlign.end,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.titleLarge(context)
-                                    .copyWith(color: AppColors.primaryOrange),
-                              );
-                            }),
+                                    .copyWith(
+                                        color: AppColors.primaryOrange,
+                                        fontSize: 18),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -1021,7 +1094,6 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                   // Submit Button
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,

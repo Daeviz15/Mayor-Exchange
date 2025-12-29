@@ -25,6 +25,29 @@ final kycStatusProvider = StreamProvider.autoDispose<KycRequest?>((ref) {
       .map((data) => data.isNotEmpty ? KycRequest.fromJson(data.first) : null);
 });
 
+/// Returns true if the current user's KYC is verified.
+/// Use this in UI to gate transaction access.
+final isKycVerifiedProvider = Provider.autoDispose<bool>((ref) {
+  final kycAsync = ref.watch(kycStatusProvider);
+  final kycRequest = kycAsync.asData?.value;
+  return kycRequest?.status == 'verified';
+});
+
+/// Returns a summary string for the user's current KYC status.
+/// Useful for displaying messages in the KYC modal.
+final kycStatusSummaryProvider = Provider.autoDispose<String>((ref) {
+  final kycAsync = ref.watch(kycStatusProvider);
+
+  return kycAsync.when(
+    data: (kyc) {
+      if (kyc == null) return 'not_started';
+      return kyc.status; // 'pending', 'in_progress', 'verified', 'rejected'
+    },
+    loading: () => 'loading',
+    error: (_, __) => 'error',
+  );
+});
+
 class KycController extends StateNotifier<AsyncValue<void>> {
   final KycRepository _repository;
   final String? _userId;

@@ -6,7 +6,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../providers/wallet_provider.dart';
 import '../../dasboard/providers/balance_provider.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../../transactions/services/forex_service.dart';
 
 class WithdrawalScreen extends ConsumerStatefulWidget {
@@ -34,8 +33,8 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     super.dispose();
   }
 
-  Future<void> _submitWithdrawal(
-      double convertedBalance, String currency, ForexService forex) async {
+  void _submitWithdrawal(
+      double convertedBalance, String currency, ForexService forex) {
     if (!_formKey.currentState!.validate()) return;
 
     final amountEntered = double.tryParse(_amountController.text) ?? 0;
@@ -50,6 +49,11 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       return;
     }
 
+    _showConfirmationDialog(amountEntered, convertedBalance, currency, forex);
+  }
+
+  Future<void> _processWithdrawal(double amountEntered, double convertedBalance,
+      String currency, ForexService forex) async {
     setState(() => _isLoading = true);
 
     try {
@@ -67,7 +71,8 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Withdrawal request submitted successfully'),
+            content: Text(
+                'Withdrawal request submitted. Balance will be updated upon approval.'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -90,9 +95,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
   @override
   Widget build(BuildContext context) {
     final balanceState = ref.watch(balanceProvider);
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
-    final currency = user?.currency ?? 'NGN';
+    const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.watch(forexServiceProvider);
 
     // Convert Total Balance (NGN) to User Currency
@@ -263,5 +266,68 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       default:
         return '₦';
     }
+  }
+
+  void _showConfirmationDialog(double amountEntered, double convertedBalance,
+      String currency, ForexService forex) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.backgroundCard,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Confirm Withdrawal',
+              style: AppTextStyles.titleMedium(context)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Amount', '₦${amountEntered.toStringAsFixed(2)}'),
+              const SizedBox(height: 8),
+              _buildDetailRow('Bank Name', _bankNameController.text),
+              const SizedBox(height: 8),
+              _buildDetailRow('Account Number', _accountNumberController.text),
+              const SizedBox(height: 8),
+              _buildDetailRow('Account Name', _accountNameController.text),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child:
+                  const Text('Cancel', style: TextStyle(color: Colors.white70)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _processWithdrawal(
+                    amountEntered, convertedBalance, currency, forex);
+              },
+              child: const Text('Confirm',
+                  style: TextStyle(color: AppColors.primaryOrange)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.white),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }

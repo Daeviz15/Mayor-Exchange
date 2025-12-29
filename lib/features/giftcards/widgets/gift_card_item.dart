@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../models/gift_card.dart';
 
@@ -34,7 +35,7 @@ class GiftCardItem extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gift Card
+            // Gift Card with Image Support
             Container(
               height: 120,
               decoration: BoxDecoration(
@@ -48,24 +49,9 @@ class GiftCardItem extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Center(
-                child: giftCard.logoText != null
-                    ? Text(
-                        giftCard.logoText!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      )
-                    : giftCard.icon != null
-                        ? Icon(
-                            giftCard.icon,
-                            color: Colors.white,
-                            size: 40,
-                          )
-                        : const SizedBox(),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _buildCardContent(),
               ),
             ),
             const SizedBox(height: 12),
@@ -81,5 +67,51 @@ class GiftCardItem extends StatelessWidget {
       ),
     );
   }
-}
 
+  /// Build card content - image if available, otherwise text/icon fallback
+  Widget _buildCardContent() {
+    // If has image URL, show network image
+    if (giftCard.hasImage) {
+      return CachedNetworkImage(
+        imageUrl: giftCard.imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        placeholder: (context, url) => _buildFallbackContent(),
+        errorWidget: (context, url, error) => _buildFallbackContent(),
+      );
+    }
+
+    return _buildFallbackContent();
+  }
+
+  /// Build fallback content (logo text or icon)
+  Widget _buildFallbackContent() {
+    return Center(
+      child: giftCard.logoText != null
+          ? Text(
+              giftCard.logoText!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            )
+          : giftCard.icon != null
+              ? Icon(
+                  giftCard.icon,
+                  color: Colors.white,
+                  size: 40,
+                )
+              : Text(
+                  giftCard.name.substring(0, 1).toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+    );
+  }
+}

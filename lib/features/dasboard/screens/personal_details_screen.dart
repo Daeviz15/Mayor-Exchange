@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../auth/providers/profile_avatar_provider.dart';
@@ -166,6 +167,10 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
   }
 
   Future<void> _pickAvatar() async {
+    final hasPermission =
+        await PermissionUtils.requestGalleryPermission(context);
+    if (!hasPermission) return;
+
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;

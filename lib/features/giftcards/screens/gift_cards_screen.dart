@@ -1,11 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/rocket_loader.dart';
 import '../models/gift_card.dart';
-import '../data/gift_cards_data.dart';
+import '../providers/gift_cards_providers.dart';
 import '../widgets/gift_card_item.dart';
-import 'buy_sell_giftcard_screen.dart';
+import 'sell_giftcard_screen.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/search_bar_widget.dart';
 import '../../auth/providers/auth_providers.dart';
@@ -22,15 +24,11 @@ class GiftCardsScreen extends ConsumerStatefulWidget {
 class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = GiftCardCategory.all;
-
-  List<GiftCard> _allGiftCards = [];
-  List<GiftCard> _filteredGiftCards = [];
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _allGiftCards = GiftCardsData.getAllGiftCards();
-    _filteredGiftCards = _allGiftCards;
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -42,25 +40,8 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   }
 
   void _onSearchChanged() {
-    _filterGiftCards();
-  }
-
-  void _filterGiftCards() {
     setState(() {
-      final query = _searchController.text.toLowerCase();
-
-      _filteredGiftCards = _allGiftCards.where((card) {
-        // Category filter
-        final categoryMatch = _selectedCategory == GiftCardCategory.all ||
-            card.category == _selectedCategory;
-
-        // Search filter
-        final searchMatch = query.isEmpty ||
-            card.name.toLowerCase().contains(query) ||
-            card.category.toLowerCase().contains(query);
-
-        return categoryMatch && searchMatch;
-      }).toList();
+      _searchQuery = _searchController.text.toLowerCase();
     });
   }
 
@@ -68,7 +49,25 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
     setState(() {
       _selectedCategory = category;
     });
-    _filterGiftCards();
+  }
+
+  /// Filter cards based on search and category
+  List<GiftCard> _filterCards(List<GiftCard> cards) {
+    return cards.where((card) {
+      final categoryMatch = _selectedCategory == GiftCardCategory.all ||
+          card.category == _selectedCategory;
+      final searchMatch = _searchQuery.isEmpty ||
+          card.name.toLowerCase().contains(_searchQuery) ||
+          card.category.toLowerCase().contains(_searchQuery);
+      return categoryMatch && searchMatch;
+    }).toList();
+  }
+
+  /// Get unique categories from cards
+  List<String> _getCategories(List<GiftCard> cards) {
+    final categories = cards.map((c) => c.category).toSet().toList();
+    categories.sort();
+    return [GiftCardCategory.all, ...categories];
   }
 
   @override
@@ -76,154 +75,154 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
     // Get user's preferred currency from their profile
     final authState = ref.watch(authControllerProvider);
     final user = authState.asData?.value;
-    final userCurrency = user?.currency ?? 'NGN';
+    const userCurrency = 'NGN'; // Hardcoded - country selection coming in v2.0
+
+    // Watch gift cards from database
+    final giftCardsAsync = ref.watch(giftCardsFromDbProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+        child: giftCardsAsync.when(
+          loading: () => const Center(child: RocketLoader()),
+          error: (e, _) => Center(
+            child: Text('Error: $e', style: const TextStyle(color: Colors.red)),
+          ),
+          data: (allCards) {
+            final filteredCards = _filterCards(allCards);
+            final categories = _getCategories(allCards);
+
+            return Column(
+              children: [
+                // Header
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (Navigator.canPop(context))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: InkWell(
-                            onTap: () => Navigator.pop(context),
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.backgroundCard,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.arrow_back_ios_new,
-                                size: 18,
-                                color: Colors.white,
+                      Row(
+                        children: [
+                          if (Navigator.canPop(context))
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: InkWell(
+                                onTap: () => Navigator.pop(context),
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.backgroundCard,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back_ios_new,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
+                          Text('Giftcards',
+                              style: AppTextStyles.headlineMedium(context)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundCard,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          userCurrency,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
                           ),
                         ),
-                      Text(
-                        'Giftcards',
-                        style: AppTextStyles.headlineMedium(context),
                       ),
                     ],
                   ),
-                  // Static currency display (based on user's country)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundCard,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      userCurrency,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
+                ),
+
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SearchBarWidget(
+                    controller: _searchController,
+                    onChanged: (_) => setState(() {}),
+                    onClear: () => setState(() => _searchController.clear()),
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SearchBarWidget(
-                controller: _searchController,
-                onChanged: (_) => _filterGiftCards(),
-                onClear: () => _filterGiftCards(),
-              ),
-            ),
+                const SizedBox(height: 20),
 
-            const SizedBox(height: 20),
+                // Category Filters
+                SizedBox(
+                  height: 50,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    children: categories.map((category) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: CategoryChip(
+                          label: category,
+                          isSelected: _selectedCategory == category,
+                          onTap: () => _onCategorySelected(category),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
 
-            // Category Filters
-            SizedBox(
-              height: 50,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: GiftCardsData.getCategories().map((category) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: CategoryChip(
-                      label: category,
-                      isSelected: _selectedCategory == category,
-                      onTap: () => _onCategorySelected(category),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+                const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
-
-            // Gift Cards Grid
-            Expanded(
-              child: _filteredGiftCards.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: AppColors.textTertiary,
+                // Gift Cards Grid
+                Expanded(
+                  child: filteredCards.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off,
+                                  size: 64, color: AppColors.textTertiary),
+                              const SizedBox(height: 16),
+                              Text('No gift cards found',
+                                  style: AppTextStyles.titleMedium(context)
+                                      .copyWith(color: AppColors.textTertiary)),
+                              const SizedBox(height: 8),
+                              Text('Try a different search or category',
+                                  style: AppTextStyles.bodyMedium(context)),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No gift cards found',
-                            style: AppTextStyles.titleMedium(context).copyWith(
-                              color: AppColors.textTertiary,
-                            ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.75,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 20,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Try a different search or category',
-                            style: AppTextStyles.bodyMedium(context),
-                          ),
-                        ],
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.75,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 20,
-                      ),
-                      itemCount: _filteredGiftCards.length,
-                      itemBuilder: (context, index) {
-                        return GiftCardItem(
-                          giftCard: _filteredGiftCards[index],
-                          onTap: () {
-                            // Navigate to gift card details or trade screen
-                            _showGiftCardDetails(_filteredGiftCards[index]);
+                          itemCount: filteredCards.length,
+                          itemBuilder: (context, index) {
+                            return GiftCardItem(
+                              giftCard: filteredCards[index],
+                              onTap: () =>
+                                  _showGiftCardDetails(filteredCards[index]),
+                            );
                           },
-                        );
-                      },
-                    ),
-            ),
-          ],
+                        ),
+                ),
+              ],
+            );
+          },
         ),
       ),
-
-      // Bottom Navigation Removed (Handled by DashboardTab/IndexedStack)
     );
   }
 
@@ -257,25 +256,34 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
               decoration: BoxDecoration(
                 color: giftCard.cardColor,
                 borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: giftCard.logoText != null
-                    ? Text(
-                        giftCard.logoText!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
+                image: giftCard.imageUrl != null &&
+                        giftCard.imageUrl!.isNotEmpty
+                    ? DecorationImage(
+                        image: CachedNetworkImageProvider(giftCard.imageUrl!),
+                        fit: BoxFit.cover,
                       )
-                    : giftCard.icon != null
-                        ? Icon(
-                            giftCard.icon,
-                            color: Colors.white,
-                            size: 48,
-                          )
-                        : const SizedBox(),
+                    : null,
               ),
+              child: giftCard.imageUrl != null && giftCard.imageUrl!.isNotEmpty
+                  ? null
+                  : Center(
+                      child: giftCard.logoText != null
+                          ? Text(
+                              giftCard.logoText!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : giftCard.icon != null
+                              ? Icon(
+                                  giftCard.icon,
+                                  color: Colors.white,
+                                  size: 48,
+                                )
+                              : const SizedBox(),
+                    ),
             ),
             const SizedBox(height: 24),
             Text(
@@ -296,10 +304,8 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => BuySellGiftCardScreen(
+                      builder: (context) => SellGiftCardScreen(
                         giftCard: giftCard,
-                        isBuy:
-                            false, // Default to sell (most common user action)
                       ),
                     ),
                   );

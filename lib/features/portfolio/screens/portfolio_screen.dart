@@ -26,7 +26,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final authState = ref.watch(authControllerProvider);
     final user = authState.asData?.value;
 
-    final currency = user?.currency ?? 'NGN';
+    const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     // Use ForexService for conversion
     final forexService = ref.read(forexServiceProvider);
     final convertedBalance =

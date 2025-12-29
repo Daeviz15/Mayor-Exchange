@@ -7,6 +7,7 @@ import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/widgets/rocket_loader.dart';
+import '../../../core/widgets/error_state_widget.dart';
 
 class AdminTransactionDetailScreen extends ConsumerStatefulWidget {
   final TransactionModel transaction;
@@ -21,7 +22,6 @@ class AdminTransactionDetailScreen extends ConsumerStatefulWidget {
 class _AdminTransactionDetailScreenState
     extends ConsumerState<AdminTransactionDetailScreen> {
   bool _isLoading = false;
-  final _noteController = TextEditingController();
   final _bankDetailsController = TextEditingController();
   final _giftCardInfoController = TextEditingController();
 
@@ -46,6 +46,71 @@ class _AdminTransactionDetailScreenState
     }
   }
 
+  Future<String?> _showReasonDialog(
+      {required String actionLabel, bool isMandatory = false}) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundCard,
+        title: Text('$actionLabel Transaction',
+            style: const TextStyle(color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isMandatory
+                  ? 'Please provide a reason for this action.'
+                  : 'Add an optional remark (or leave empty).',
+              style:
+                  const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Enter note here...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: AppColors.backgroundDark,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryOrange,
+            ),
+            onPressed: () {
+              final text = controller.text.trim();
+              if (isMandatory && text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Reason is required')),
+                );
+                return;
+              }
+              Navigator.pop(context, text);
+            },
+            child:
+                Text(actionLabel, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final transactionId = widget.transaction.id;
@@ -65,9 +130,10 @@ class _AdminTransactionDetailScreenState
       ),
       body: transactionAsync.when(
         loading: () => _buildContent(widget.transaction, isLoading: true),
-        error: (err, stack) => Center(
-            child:
-                Text('Error: $err', style: const TextStyle(color: Colors.red))),
+        error: (err, stack) => ErrorStateWidget(
+          error: err,
+          onRetry: () => ref.refresh(singleTransactionProvider(transactionId)),
+        ),
         data: (liveTransaction) {
           final transaction = liveTransaction ?? widget.transaction;
           return _buildContent(transaction);
@@ -109,6 +175,9 @@ class _AdminTransactionDetailScreenState
           if (transaction.details.containsKey('usd_input'))
             _buildDetailRow(
                 'USD Input', '\$${transaction.details['usd_input']}'),
+          if (transaction.details.containsKey('admin_name'))
+            _buildDetailRow(
+                'Assigned Agent', transaction.details['admin_name']),
 
           // User Info Section
           Column(
@@ -221,7 +290,7 @@ class _AdminTransactionDetailScreenState
   }
 
   Future<void> _approveTransaction(
-      TransactionModel transaction, WidgetRef ref) async {
+      TransactionModel transaction, WidgetRef ref, String? note) async {
     final service = ref.read(transactionServiceProvider);
     final isBuyGiftCard = transaction.type == TransactionType.buyGiftCard;
 
@@ -279,6 +348,12 @@ class _AdminTransactionDetailScreenState
       // Buy Gift Card: Code provided
       notificationMessage =
           'Transaction Completed! View details for your code.';
+    } else if (transaction.type == TransactionType.withdrawal) {
+      // Withdrawal: Money sent to user's bank
+      final bankName = transaction.details['bank_name'] ?? 'Bank';
+      final accountNum = transaction.details['account_number'] ?? '****';
+      notificationMessage =
+          'Withdrawal successful, your funds has been credited to your designated bank account ($bankName - $accountNum).';
     } else {
       // Sell Crypto / Sell GiftCard: Wallet credited
       notificationMessage =
@@ -290,7 +365,7 @@ class _AdminTransactionDetailScreenState
       targetUserId: transaction.userId,
       newStatus: TransactionStatus.completed,
       previousStatus: transaction.status,
-      note: 'Admin approved and completed transaction',
+      note: note ?? 'Admin approved and completed transaction',
       details: newDetails,
       finalPayoutAmount: finalPayout,
       notificationMessage: notificationMessage,
@@ -381,15 +456,44 @@ class _AdminTransactionDetailScreenState
               },
             ),
           ] else ...[
-            // For Sell requests, we might just mark as payment sent if we paid them externally
-            // Or if we need to send them money first (unlikely for sell, usually they send assets first)
+            // Non-Buy Requests (Withdrawal / Sell)
+            // Admin can approve directly after checking details
             _buildActionButton(
-              'Approve & Credit Wallet',
+              transaction.type == TransactionType.withdrawal
+                  ? 'Approve & Mark Sent'
+                  : 'Approve & Credit Wallet',
               Colors.green,
-              () => _approveTransaction(transaction, ref),
+              () async {
+                final note = await _showReasonDialog(
+                    actionLabel: 'Approve', isMandatory: false);
+                if (note == null) return;
+                await _approveTransaction(transaction, ref, note);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              'Reject',
+              Colors.red,
+              () async {
+                final reason = await _showReasonDialog(
+                    actionLabel: 'Reject', isMandatory: true);
+                if (reason == null) return;
+
+                await service.updateStatus(
+                  transactionId: transaction.id,
+                  targetUserId: transaction.userId,
+                  newStatus: TransactionStatus.rejected,
+                  previousStatus: transaction.status,
+                  note: reason,
+                );
+              },
             ),
           ],
+
           const SizedBox(height: 12),
+
+          // 'Pending Verification' allows moving to a holding state if needed
+          // Mostly useful for Buy requests waiting for user, or complex verifications
           _buildActionButton(
             'Pending Verification',
             Colors.orange,
@@ -482,13 +586,19 @@ class _AdminTransactionDetailScreenState
             _buildActionButton(
               'Cancel Transaction',
               Colors.red,
-              () => service.updateStatus(
-                transactionId: transaction.id,
-                targetUserId: transaction.userId,
-                newStatus: TransactionStatus.rejected,
-                previousStatus: transaction.status,
-                note: 'Cancelled by admin - user did not pay',
-              ),
+              () async {
+                final reason = await _showReasonDialog(
+                    actionLabel: 'Cancel', isMandatory: true);
+                if (reason == null) return;
+
+                await service.updateStatus(
+                  transactionId: transaction.id,
+                  targetUserId: transaction.userId,
+                  newStatus: TransactionStatus.rejected,
+                  previousStatus: transaction.status,
+                  note: reason,
+                );
+              },
             ),
           ],
         );
@@ -545,34 +655,30 @@ class _AdminTransactionDetailScreenState
           _buildActionButton(
             'Approve & Complete',
             Colors.green,
-            () => _approveTransaction(transaction, ref),
+            () async {
+              final note = await _showReasonDialog(
+                  actionLabel: 'Approve', isMandatory: false);
+              if (note == null) return;
+              await _approveTransaction(transaction, ref, note);
+            },
           ),
           const SizedBox(height: 12),
           _buildActionButton(
             'Reject',
             Colors.red,
-            () => service.updateStatus(
-              transactionId: transaction.id,
-              targetUserId: transaction.userId,
-              newStatus: TransactionStatus.rejected,
-              previousStatus: transaction.status,
-              note: _noteController.text.isEmpty
-                  ? 'Rejected by admin'
-                  : _noteController.text,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _noteController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              hintText: 'Add note for rejection...',
-              hintStyle: const TextStyle(color: Colors.grey),
-              filled: true,
-              fillColor: AppColors.backgroundCard,
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+            () async {
+              final reason = await _showReasonDialog(
+                  actionLabel: 'Reject', isMandatory: true);
+              if (reason == null) return;
+
+              await service.updateStatus(
+                transactionId: transaction.id,
+                targetUserId: transaction.userId,
+                newStatus: TransactionStatus.rejected,
+                previousStatus: transaction.status,
+                note: reason,
+              );
+            },
           ),
         ],
       );

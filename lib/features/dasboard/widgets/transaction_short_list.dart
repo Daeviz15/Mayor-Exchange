@@ -19,7 +19,7 @@ class TransactionShortList extends ConsumerWidget {
     final transactionsAsync = ref.watch(userTransactionsProvider);
     final authState = ref.watch(authControllerProvider);
     final user = authState.asData?.value;
-    final currency = user?.currency ?? 'NGN';
+    const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.read(forexServiceProvider);
 
     return Column(
@@ -69,40 +69,34 @@ class TransactionShortList extends ConsumerWidget {
 
             final recentTransactions = transactions.take(3).toList();
 
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentTransactions.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final transaction = recentTransactions[index];
-                return FadeInSlide(
-                  duration: const Duration(milliseconds: 600),
-                  delay: Duration(milliseconds: index * 100),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (transaction.type == TransactionType.buyGiftCard ||
-                          transaction.type == TransactionType.buyCrypto) {
+            return Column(
+              children: [
+                for (int i = 0; i < recentTransactions.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  FadeInSlide(
+                    duration: const Duration(milliseconds: 600),
+                    delay: Duration(milliseconds: i * 100),
+                    child: GestureDetector(
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => BuyerTransactionStatusScreen(
-                              transactionId: transaction.id,
-                              initialTransaction: transaction,
+                              transactionId: recentTransactions[i].id,
+                              initialTransaction: recentTransactions[i],
                             ),
                           ),
                         );
-                      }
-                    },
-                    child: _CompactTransactionCard(
-                      transaction: transaction,
-                      userCurrency: currency,
-                      forexService: forexService,
+                      },
+                      child: _CompactTransactionCard(
+                        transaction: recentTransactions[i],
+                        userCurrency: currency,
+                        forexService: forexService,
+                      ),
                     ),
                   ),
-                );
-              },
+                ],
+              ],
             );
           },
           loading: () => const TransactionCardSkeletonList(count: 3),

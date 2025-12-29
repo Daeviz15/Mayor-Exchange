@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../providers/transaction_service.dart';
 
 import '../../../core/widgets/rocket_loader.dart';
+import '../../../core/widgets/error_state_widget.dart';
 
 import 'buyer_transaction_status_screen.dart'; // Added import
 
@@ -37,9 +38,10 @@ class TransactionHistoryScreen extends ConsumerWidget {
         },
         child: transactionsAsync.when(
           loading: () => const Center(child: RocketLoader()),
-          error: (err, stack) => Center(
-              child: Text('Error: $err',
-                  style: const TextStyle(color: Colors.red))),
+          error: (err, stack) => ErrorStateWidget(
+            error: err,
+            onRetry: () => ref.refresh(userTransactionsProvider.future),
+          ),
           data: (transactions) {
             if (transactions.isEmpty) {
               return ListView(

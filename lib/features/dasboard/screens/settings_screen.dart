@@ -12,9 +12,9 @@ import '../../auth/screens/login_screen.dart';
 import '../../auth/screens/two_factor_screen.dart';
 import '../widgets/settings_item.dart';
 import '../widgets/profile_settings_header.dart';
-import '../widgets/country_selection_modal.dart';
 import '../../admin/providers/admin_role_provider.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
+import '../../admin/screens/admin_list_screen.dart';
 import 'personal_details_screen.dart';
 import '../../kyc/screens/kyc_verification_screen.dart';
 import '../../settings/screens/theme_screen.dart';
@@ -321,40 +321,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                 },
               ),
-              Consumer(
-                builder: (context, ref, _) {
-                  final authState = ref.watch(authControllerProvider);
-                  final user = authState.asData?.value;
-                  final currency = user?.currency ?? 'NGN';
+              // Currency locked to NGN - country selection coming in v2.0
 
-                  return SettingsItem(
-                    title: 'Currency',
-                    trailing: Row(
-                      children: [
-                        Text(currency,
-                            style: AppTextStyles.bodySmall(context)
-                                .copyWith(color: AppColors.textTertiary)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.chevron_right,
-                            color: AppColors.textTertiary, size: 20),
-                      ],
-                    ),
-                    hasArrow: false,
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isDismissible: true,
-                        enableDrag: true,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => const CountrySelectionModal(),
-                      );
-                    },
-                  );
-                },
+              const SizedBox(height: 16),
+
+              // 5. Support & About
+              _buildSectionHeader('Support & About'),
+              SettingsItem(
+                title: 'Our Verified Agents',
+                trailing: const Icon(Icons.verified,
+                    color: AppColors.primaryOrange, size: 20),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminListScreen()),
+                ),
               ),
-
-              const SizedBox(height: 32),
 
               // Log Out Button (Text Only style as per design, or subtle button)
               // The design doesn't explicitly show the bottom, assuming a clean list.

@@ -6,9 +6,11 @@ import '../../transactions/models/transaction.dart';
 import '../../transactions/repositories/transaction_repository.dart';
 import 'admin_transaction_detail_screen.dart';
 import 'admin_rates_screen.dart';
-import 'admin_giftcard_rates_screen.dart';
+
+import 'admin_giftcards_management_screen.dart';
 import 'admin_wallet_settings_screen.dart';
 import 'admin_kyc_list_screen.dart';
+import 'admin_list_screen.dart';
 
 import '../../../core/widgets/rocket_loader.dart';
 
@@ -82,13 +84,12 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
             ),
           ),
           IconButton(
-            icon:
-                const Icon(Icons.card_giftcard, color: AppColors.primaryOrange),
-            tooltip: 'Gift Card Rates',
+            icon: const Icon(Icons.add_card, color: AppColors.primaryOrange),
+            tooltip: 'Manage Gift Cards',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => const AdminGiftCardRatesScreen()),
+                  builder: (_) => const AdminGiftCardsManagementScreen()),
             ),
           ),
           IconButton(
@@ -98,6 +99,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminKycListScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.people, color: AppColors.primaryOrange),
+            tooltip: 'Admin Team',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminListScreen()),
             ),
           ),
           IconButton(

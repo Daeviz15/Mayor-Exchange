@@ -138,7 +138,13 @@ class _EmailVerificationScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // Navigate to login instead of popping to prevent empty stack crash
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          },
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,

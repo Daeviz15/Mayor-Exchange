@@ -1,18 +1,51 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import '../../../core/providers/supabase_provider.dart';
 import '../models/gift_card.dart';
 import '../data/gift_cards_data.dart';
 
-/// All Gift Cards Provider
+/// Gift Cards from Database Provider
+/// Fetches gift cards from Supabase, falls back to local data if unavailable
+final giftCardsFromDbProvider = FutureProvider<List<GiftCard>>((ref) async {
+  try {
+    final client = ref.read(supabaseClientProvider);
+
+    final response = await client
+        .from('gift_cards')
+        .select()
+        .eq('is_active', true)
+        .order('display_order', ascending: true);
+
+    if (response.isEmpty) {
+      // No data in database, use local fallback
+      return GiftCardsData.getAllGiftCards();
+    }
+
+    return (response as List)
+        .map((json) => GiftCard.fromJson(json as Map<String, dynamic>))
+        .toList();
+  } catch (e) {
+    // Database error, use local fallback
+    return GiftCardsData.getAllGiftCards();
+  }
+});
+
+/// All Gift Cards Provider (for backward compatibility)
+/// Uses database cards if available, otherwise local data
 final allGiftCardsProvider = Provider<List<GiftCard>>((ref) {
-  return GiftCardsData.getAllGiftCards();
+  final dbCards = ref.watch(giftCardsFromDbProvider);
+  return dbCards.when(
+    data: (cards) => cards,
+    loading: () => GiftCardsData.getAllGiftCards(),
+    error: (_, __) => GiftCardsData.getAllGiftCards(),
+  );
 });
 
 /// Selected Category Provider
 final selectedCategoryProvider =
     StateNotifierProvider<CategoryNotifier, String>((ref) {
-      return CategoryNotifier();
-    });
+  return CategoryNotifier();
+});
 
 class CategoryNotifier extends StateNotifier<String> {
   CategoryNotifier() : super(GiftCardCategory.all);
@@ -40,8 +73,8 @@ class SearchQueryNotifier extends StateNotifier<String> {
 /// Selected Currency Provider
 final selectedCurrencyProvider =
     StateNotifierProvider<CurrencyNotifier, String>((ref) {
-      return CurrencyNotifier();
-    });
+  return CurrencyNotifier();
+});
 
 class CurrencyNotifier extends StateNotifier<String> {
   CurrencyNotifier() : super('USD');
@@ -64,11 +97,18 @@ final filteredGiftCardsProvider = Provider<List<GiftCard>>((ref) {
         category == GiftCardCategory.all || card.category == category;
 
     // Search filter
-    final searchMatch =
-        query.isEmpty ||
+    final searchMatch = query.isEmpty ||
         card.name.toLowerCase().contains(query) ||
         card.category.toLowerCase().contains(query);
 
     return categoryMatch && searchMatch;
   }).toList();
+});
+
+/// Get categories from database or local
+final giftCardCategoriesProvider = Provider<List<String>>((ref) {
+  final cards = ref.watch(allGiftCardsProvider);
+  final categories = cards.map((c) => c.category).toSet().toList();
+  categories.sort();
+  return [GiftCardCategory.all, ...categories];
 });

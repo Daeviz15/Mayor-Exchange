@@ -48,9 +48,13 @@
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>We use your photo library to let you pick a profile picture.</string>
+		<string>We use your photo library to let you pick a profile picture or upload transaction proofs.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>We need permission to save images to your photo library.</string>
 		<key>NSCameraUsageDescription</key>
-		<string>We use the camera to let you take a profile picture.</string>
+		<string>We use the camera to let you take a profile picture or capture documents.</string>
+		<key>NSFaceIDUsageDescription</key>
+		<string>We use Face ID to securely unlock the app and authorize transactions.</string>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
@@ -62,5 +66,12 @@
 				</array>
 			</dict>
 		</array>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsArbitraryLoads</key>
+			<true/>
+		</dict>
 	</dict>
 </plist>
