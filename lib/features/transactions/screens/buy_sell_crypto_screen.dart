@@ -9,6 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
+import '../../../core/widgets/currency_text.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../../crypto/providers/crypto_providers.dart';
 import '../services/forex_service.dart';
@@ -720,15 +721,27 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
-                              child: Text(
-                                '≈ $currencySymbol${forexService.convertToNgn(marketPrice, 'USD').toStringAsFixed(2)}',
-                                style: AppTextStyles.headlineMedium(context)
-                                    .copyWith(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primaryOrange,
-                                  letterSpacing: -0.5,
-                                ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '≈ ',
+                                    style: AppTextStyles.headlineMedium(context)
+                                        .copyWith(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryOrange,
+                                    ),
+                                  ),
+                                  CurrencyText(
+                                    symbol: currencySymbol,
+                                    amount: forexService
+                                        .convertToNgn(marketPrice, 'USD')
+                                        .toStringAsFixed(2),
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -783,10 +796,24 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                                       color: AppColors.primaryOrange,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500)),
-                              Text(
-                                '1 $_selectedAsset = $currencySymbol${activeAdminRate?.toStringAsFixed(2) ?? "0.00"}',
-                                style: AppTextStyles.titleMedium(context)
-                                    .copyWith(color: AppColors.primaryOrange),
+                              Row(
+                                children: [
+                                  Text(
+                                    '1 $_selectedAsset = ',
+                                    style: AppTextStyles.titleMedium(context)
+                                        .copyWith(
+                                            color: AppColors.primaryOrange),
+                                  ),
+                                  CurrencyText(
+                                    symbol: currencySymbol,
+                                    amount:
+                                        activeAdminRate?.toStringAsFixed(2) ??
+                                            "0.00",
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -854,16 +881,22 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                                 style: AppTextStyles.bodyMedium(context)),
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Text(
-                                isBuy
-                                    ? '$currencySymbol${_inputValue.toStringAsFixed(2)}'
-                                    : '${_inputValue.toStringAsFixed(8)} $_selectedAsset',
-                                textAlign: TextAlign.end,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
+                              child: isBuy
+                                  ? CurrencyText(
+                                      symbol: currencySymbol,
+                                      amount: _inputValue.toStringAsFixed(2),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    )
+                                  : Text(
+                                      '${_inputValue.toStringAsFixed(8)} $_selectedAsset',
+                                      textAlign: TextAlign.end,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold),
+                                    ),
                             ),
                           ],
                         ),
@@ -876,17 +909,23 @@ class _BuySellCryptoScreenState extends ConsumerState<BuySellCryptoScreen>
                                 style: AppTextStyles.bodyLarge(context)),
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Text(
-                                isBuy
-                                    ? '${outputAmount.toStringAsFixed(8)} $_selectedAsset'
-                                    : '$currencySymbol${outputAmount.toStringAsFixed(2)}',
-                                textAlign: TextAlign.end,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.titleLarge(context)
-                                    .copyWith(
-                                        color: AppColors.primaryOrange,
-                                        fontSize: 18),
-                              ),
+                              child: isBuy
+                                  ? Text(
+                                      '${outputAmount.toStringAsFixed(8)} $_selectedAsset',
+                                      textAlign: TextAlign.end,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.titleLarge(context)
+                                          .copyWith(
+                                              color: AppColors.primaryOrange,
+                                              fontSize: 18),
+                                    )
+                                  : CurrencyText(
+                                      symbol: currencySymbol,
+                                      amount: outputAmount.toStringAsFixed(2),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primaryOrange,
+                                    ),
                             ),
                           ],
                         ),

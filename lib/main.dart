@@ -9,15 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/widgets/offline_overlay.dart';
 import 'core/providers/shared_preferences_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 Future<void> main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Disable runtime font fetching to prevent network errors
-  // Fonts will be loaded from bundled assets
-  GoogleFonts.config.allowRuntimeFetching = false;
 
   // Load environment variables
   await dotenv.load(fileName: '.env');

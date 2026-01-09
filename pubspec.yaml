@@ -111,6 +111,38 @@ flutter:
 
   # Custom fonts bundled for offline use
   fonts:
+    - family: Host Grotesk
+      fonts:
+        - asset: assets/fonts/static/HostGrotesk-Light.ttf
+          weight: 300
+        - asset: assets/fonts/static/HostGrotesk-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/static/HostGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/static/HostGrotesk-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/static/HostGrotesk-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/static/HostGrotesk-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/static/HostGrotesk-LightItalic.ttf
+          weight: 300
+          style: italic
+        - asset: assets/fonts/static/HostGrotesk-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/static/HostGrotesk-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/static/HostGrotesk-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/static/HostGrotesk-BoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/static/HostGrotesk-ExtraBoldItalic.ttf
+          weight: 800
+          style: italic
     - family: Plus Jakarta Sans
       fonts:
         - asset: assets/fonts/PlusJakartaSans-Regular.ttf

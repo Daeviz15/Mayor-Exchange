@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'app_colors.dart';
 
 /// App Theme Configuration
@@ -31,8 +31,9 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         iconTheme: const IconThemeData(color: Colors.black),
-        titleTextStyle: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        titleTextStyle: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 23,
           fontWeight: FontWeight.w600,
           color: Colors.black,
@@ -60,8 +61,9 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.getFont(
-            'Plus Jakarta Sans',
+          textStyle: TextStyle(
+            fontFamily: 'Host Grotesk',
+            fontFamilyFallback: ['Roboto', 'Noto Sans'],
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -134,8 +136,9 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        titleTextStyle: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 23,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -162,8 +165,9 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.getFont(
-            'Plus Jakarta Sans',
+          textStyle: TextStyle(
+            fontFamily: 'Host Grotesk',
+            fontFamilyFallback: ['Roboto', 'Noto Sans'],
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -174,8 +178,9 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primaryOrange,
-          textStyle: GoogleFonts.getFont(
-            'Plus Jakarta Sans',
+          textStyle: TextStyle(
+            fontFamily: 'Host Grotesk',
+            fontFamilyFallback: ['Roboto', 'Noto Sans'],
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -205,8 +210,9 @@ class AppTheme {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        hintStyle: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           color: AppColors.textTertiary,
           fontSize: 14,
         ),
@@ -244,95 +250,110 @@ class AppTheme {
 
       // Text Theme
       textTheme: TextTheme(
-        displayLarge: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        displayLarge: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 32,
           fontWeight: FontWeight.w900,
           color: AppColors.textPrimary,
           letterSpacing: -0.5,
         ),
-        displayMedium: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        displayMedium: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 28,
           fontWeight: FontWeight.w900,
           color: AppColors.textPrimary,
           letterSpacing: -0.5,
         ),
-        displaySmall: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        displaySmall: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 24,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
           letterSpacing: -0.3,
         ),
-        headlineLarge: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        headlineLarge: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 30,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        headlineMedium: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        headlineMedium: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 28,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
         ),
-        headlineSmall: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        headlineSmall: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        titleLarge: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        titleLarge: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 23,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleMedium: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        titleMedium: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 18,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
         ),
-        titleSmall: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        titleSmall: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        bodyLarge: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        bodyLarge: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
-        bodyMedium: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        bodyMedium: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
-        bodySmall: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        bodySmall: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 12,
           fontWeight: FontWeight.w400,
           color: AppColors.textTertiary,
         ),
-        labelLarge: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        labelLarge: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        labelMedium: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        labelMedium: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 12,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
-        labelSmall: GoogleFonts.getFont(
-          'Plus Jakarta Sans',
+        labelSmall: TextStyle(
+          fontFamily: 'Host Grotesk',
+          fontFamilyFallback: ['Roboto', 'Noto Sans'],
           fontSize: 10,
           fontWeight: FontWeight.w500,
           color: AppColors.textTertiary,
@@ -347,8 +368,9 @@ class AppTheme {
     double? letterSpacing,
     Color? color,
   ]) {
-    return GoogleFonts.getFont(
-      'Plus Jakarta Sans',
+    return TextStyle(
+      fontFamily: 'Host Grotesk',
+      fontFamilyFallback: ['Roboto', 'Noto Sans'],
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color ?? Colors.black, // Default to black for light mode

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -111,7 +110,9 @@ class _CreateNewPasswordScreenState
               Center(
                 child: Text(
                   'Create New Password',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
+                    fontFamily: 'Host Grotesk',
+                    fontFamilyFallback: ['Roboto', 'Noto Sans'],
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -126,7 +127,9 @@ class _CreateNewPasswordScreenState
                   children: [
                     Text(
                       'New Password',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
+                        fontFamily: 'Host Grotesk',
+                        fontFamilyFallback: ['Roboto', 'Noto Sans'],
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -178,7 +181,9 @@ class _CreateNewPasswordScreenState
                     const SizedBox(height: 24),
                     Text(
                       'Confirm Password',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
+                        fontFamily: 'Host Grotesk',
+                        fontFamilyFallback: ['Roboto', 'Noto Sans'],
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -250,7 +255,9 @@ class _CreateNewPasswordScreenState
                         )
                       : Text(
                           'Reset My Password',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(
+                            fontFamily: 'Host Grotesk',
+                            fontFamilyFallback: ['Roboto', 'Noto Sans'],
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,

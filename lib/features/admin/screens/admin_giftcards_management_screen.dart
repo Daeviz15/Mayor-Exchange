@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/rocket_loader.dart';
@@ -21,6 +22,15 @@ class AdminGiftCardsManagementScreen extends ConsumerStatefulWidget {
 
 class _AdminGiftCardsManagementScreenState
     extends ConsumerState<AdminGiftCardsManagementScreen> {
+  /// Clear all image caches to force fresh load
+  void _clearImageCaches() {
+    // Clear CachedNetworkImage cache
+    DefaultCacheManager().emptyCache();
+    // Clear Flutter's image cache
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+  }
+
   @override
   Widget build(BuildContext context) {
     final giftCardsAsync = ref.watch(giftCardsFromDbProvider);
@@ -69,13 +79,23 @@ class _AdminGiftCardsManagementScreenState
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: cards.length,
-            itemBuilder: (context, index) {
-              final card = cards[index];
-              return _buildCardTile(context, card);
+          return RefreshIndicator(
+            onRefresh: () async {
+              _clearImageCaches();
+              ref.invalidate(giftCardsFromDbProvider);
+              await Future.delayed(const Duration(milliseconds: 300));
             },
+            color: AppColors.primaryOrange,
+            backgroundColor: AppColors.backgroundCard,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: cards.length,
+              itemBuilder: (context, index) {
+                final card = cards[index];
+                return _buildCardTile(context, card);
+              },
+            ),
           );
         },
       ),
@@ -105,6 +125,8 @@ class _AdminGiftCardsManagementScreenState
                 ? CachedNetworkImage(
                     imageUrl: card.imageUrl!,
                     fit: BoxFit.cover,
+                    // Use URL as cache key to force refresh when URL changes
+                    cacheKey: card.imageUrl,
                     placeholder: (_, __) => _buildFallback(card),
                     errorWidget: (_, __, ___) => _buildFallback(card),
                   )
@@ -212,7 +234,7 @@ class _AdminGiftCardsManagementScreenState
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: CachedNetworkImage(
-                                  imageUrl: currentImageUrl!,
+                                  imageUrl: currentImageUrl,
                                   fit: BoxFit.cover,
                                 ),
                               )
@@ -243,7 +265,7 @@ class _AdminGiftCardsManagementScreenState
                     hint: 'Fallback text'),
                 _buildField('Redemption URL', redemptionUrlController,
                     hint: 'Optional'),
-                _buildField('Buy Rate (₦ per \$1)', rateController,
+                _buildField('Buy Rate (\u20A6 per \$1)', rateController,
                     hint: 'Rate you PAY the user (e.g. 1450)'),
               ],
             ),
@@ -302,8 +324,23 @@ class _AdminGiftCardsManagementScreenState
                           isEdit: isEdit,
                         );
 
-                        if (mounted) Navigator.pop(dialogContext);
+                        // Clear all image caches before refreshing
+                        _clearImageCaches();
+
+                        // Refresh the provider
                         ref.invalidate(giftCardsFromDbProvider);
+
+                        if (mounted) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isEdit
+                                  ? 'Gift card updated!'
+                                  : 'Gift card added!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -338,12 +375,24 @@ class _AdminGiftCardsManagementScreenState
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: controller,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(
+          color: Colors.white,
+          fontFamily: 'Roboto',
+          fontFamilyFallback: ['Noto Sans'],
+        ),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: AppColors.textSecondary),
+          labelStyle: TextStyle(
+            color: AppColors.textSecondary,
+            fontFamily: 'Roboto',
+            fontFamilyFallback: ['Noto Sans'],
+          ),
           hintText: hint,
-          hintStyle: TextStyle(color: AppColors.textTertiary),
+          hintStyle: TextStyle(
+            color: AppColors.textTertiary,
+            fontFamily: 'Roboto',
+            fontFamilyFallback: ['Noto Sans'],
+          ),
           filled: true,
           fillColor: AppColors.backgroundElevated,
           border: OutlineInputBorder(
@@ -358,20 +407,28 @@ class _AdminGiftCardsManagementScreenState
   Future<String?> _uploadImage(File file, String cardId) async {
     final client = ref.read(supabaseClientProvider);
     final fileExt = file.path.split('.').last;
-    final fileName = '$cardId.$fileExt';
+    // Add timestamp to filename to bust cache
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final fileName = '${cardId}_$timestamp.$fileExt';
 
-    // Upload to gift-card-images bucket (upsert if exists)
-    // First try to remove old file, then upload new one
-    try {
-      await client.storage.from('gift-card-images').remove([fileName]);
-    } catch (_) {
-      // File may not exist, ignore error
-    }
-
+    // Upload new file (unique filename each time)
     await client.storage.from('gift-card-images').upload(fileName, file);
 
     // Get public URL
     final url = client.storage.from('gift-card-images').getPublicUrl(fileName);
+
+    // Try to clean up old images for this card (optional, best effort)
+    try {
+      final files = await client.storage.from('gift-card-images').list();
+      for (final f in files) {
+        if (f.name.startsWith('${cardId}_') && f.name != fileName) {
+          await client.storage.from('gift-card-images').remove([f.name]);
+        }
+      }
+    } catch (_) {
+      // Ignore cleanup errors
+    }
+
     return url;
   }
 
@@ -437,6 +494,7 @@ class _AdminGiftCardsManagementScreenState
       try {
         final client = ref.read(supabaseClientProvider);
         await client.from('gift_cards').delete().eq('id', card.id);
+        _clearImageCaches();
         ref.invalidate(giftCardsFromDbProvider);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

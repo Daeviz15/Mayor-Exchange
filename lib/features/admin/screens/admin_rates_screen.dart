@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/rocket_loader.dart';
+import '../../../core/widgets/currency_text.dart';
 import '../../transactions/providers/rates_provider.dart';
 
 class AdminRatesScreen extends ConsumerStatefulWidget {
@@ -94,10 +95,28 @@ class _AdminRatesScreenState extends ConsumerState<AdminRatesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('Buy: ₦${rate.buyRate.toStringAsFixed(0)}',
-                style: const TextStyle(color: Colors.green)),
-            Text('Sell: ₦${rate.sellRate.toStringAsFixed(0)}',
-                style: const TextStyle(color: Colors.redAccent)),
+            Row(
+              children: [
+                const Text('Buy: ', style: TextStyle(color: Colors.green)),
+                CurrencyText(
+                  symbol: '₦',
+                  amount: rate.buyRate.toStringAsFixed(0),
+                  fontSize: 14,
+                  color: Colors.green,
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Text('Sell: ', style: TextStyle(color: Colors.redAccent)),
+                CurrencyText(
+                  symbol: '₦',
+                  amount: rate.sellRate.toStringAsFixed(0),
+                  fontSize: 14,
+                  color: Colors.redAccent,
+                ),
+              ],
+            ),
           ],
         ),
         trailing: IconButton(

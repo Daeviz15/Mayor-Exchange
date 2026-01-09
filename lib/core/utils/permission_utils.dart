@@ -4,6 +4,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_colors.dart';
 
 class PermissionUtils {
+  static bool _isRequesting = false;
+
   /// Request Camera Permission
   static Future<bool> requestCameraPermission(BuildContext context) async {
     return _requestPermission(
@@ -16,31 +18,75 @@ class PermissionUtils {
 
   /// Request Gallery/Photos Permission
   static Future<bool> requestGalleryPermission(BuildContext context) async {
-    // Android 13+ (SDK 33) uses READ_MEDIA_IMAGES for photos
-    Permission permission = Permission.photos;
+    // On Android 13+ (SDK 33), use Permission.photos (READ_MEDIA_IMAGES).
+    // On older Android, use Permission.storage (READ_EXTERNAL_STORAGE).
+    // iOS uses Permission.photos.
 
     if (Platform.isAndroid) {
-      final storageStatus = await Permission.storage.status;
-      final photosStatus = await Permission.photos.status;
+      if (_isRequesting) return false;
+      _isRequesting = true;
 
-      // 1. Check if either is already granted
-      if (storageStatus.isGranted || photosStatus.isGranted) {
-        return true;
-      }
+      try {
+        // First, check if already granted
+        final storageStatus = await Permission.storage.status;
+        final photosStatus = await Permission.photos.status;
 
-      // 2. Select permission based on OS behavior
-      // On Android 13+ (SDK 33), storage is 'permanentlyDenied' (disabled).
-      // On Android < 13, storage is 'denied' (requestable).
-      if (!storageStatus.isPermanentlyDenied) {
-        permission = Permission.storage;
-      } else {
-        permission = Permission.photos;
+        if (storageStatus.isGranted || photosStatus.isGranted) {
+          return true;
+        }
+
+        // Try Permission.photos first (Android 13+)
+        final photosResult = await Permission.photos.request();
+        if (photosResult.isGranted) {
+          return true;
+        }
+
+        // If photos permission is restricted/unavailable (older Android), try storage
+        if (photosResult.isDenied || photosResult.isPermanentlyDenied) {
+          final storageResult = await Permission.storage.request();
+          if (storageResult.isGranted) {
+            return true;
+          }
+
+          // Both denied - show settings dialog if permanently denied
+          if (photosResult.isPermanentlyDenied ||
+              storageResult.isPermanentlyDenied) {
+            if (context.mounted) {
+              _showSettingsDialog(
+                context,
+                'Photo Library',
+                'We need access to your photo library to select images.',
+              );
+            }
+            return false;
+          }
+        }
+
+        // Simple denial - show retry snackbar
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                  'Photo Library permission is required to select images.'),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () => requestGalleryPermission(context),
+              ),
+            ),
+          );
+        }
+        return false;
+      } finally {
+        _isRequesting = false;
       }
     }
 
+    // iOS and other platforms
     return _requestPermission(
       context,
-      permission,
+      Permission.photos,
       'Photo Library',
       'We need access to your photo library to select images.',
     );
@@ -60,43 +106,45 @@ class PermissionUtils {
       return true;
     }
 
-    // 2. Request permission
-    // Sometimes we might want to show rationale BEFORE requesting if needed,
-    // but standard flow is Request -> If Denied -> Rationale -> Settings.
+    if (_isRequesting) return false;
+    _isRequesting = true;
 
-    final result = await permission.request();
+    try {
+      // 2. Request permission
+      final result = await permission.request();
 
-    if (result.isGranted) {
-      return true;
-    }
-
-    // 3. Handle Permanent Denial (User selected "Don't ask again")
-    if (result.isPermanentlyDenied) {
-      if (context.mounted) {
-        _showSettingsDialog(context, featureName, rationale);
+      if (result.isGranted) {
+        return true;
       }
-      return false;
-    }
 
-    // 4. Handle Simple Denial (User just clicked Deny)
-    // We could show a snackbar or rationale here if we want to be very persistent,
-    // but usually we respect the first denial and maybe show a hint.
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$featureName permission is required. $rationale'),
-          backgroundColor: Colors.red,
-          action: SnackBarAction(
-            label: 'Retry',
-            textColor: Colors.white,
-            onPressed: () =>
-                _requestPermission(context, permission, featureName, rationale),
+      // 3. Handle Permanent Denial (User selected "Don't ask again")
+      if (result.isPermanentlyDenied) {
+        if (context.mounted) {
+          _showSettingsDialog(context, featureName, rationale);
+        }
+        return false;
+      }
+
+      // 4. Handle Simple Denial (User just clicked Deny)
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$featureName permission is required. $rationale'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _requestPermission(
+                  context, permission, featureName, rationale),
+            ),
           ),
-        ),
-      );
-    }
+        );
+      }
 
-    return false;
+      return false;
+    } finally {
+      _isRequesting = false;
+    }
   }
 
   static void _showSettingsDialog(

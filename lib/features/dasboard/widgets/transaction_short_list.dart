@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/currency_text.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/screens/transaction_history_screen.dart';
 import '../../transactions/screens/buyer_transaction_status_screen.dart';
 import '../../transactions/services/forex_service.dart';
-import '../../auth/providers/auth_providers.dart';
+
 import '../../../core/widgets/animations/fade_in_slide.dart';
 import 'transaction_card_skeleton.dart';
 
@@ -17,8 +18,7 @@ class TransactionShortList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transactionsAsync = ref.watch(userTransactionsProvider);
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
+
     const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.read(forexServiceProvider);
 
@@ -194,14 +194,14 @@ class _CompactTransactionCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${isCredit ? '+' : '-'}$symbol${convertAmount.toStringAsFixed(2)}',
-                style: AppTextStyles.bodyMedium(context).copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isCredit
-                      ? AppColors.success
-                      : AppColors.textPrimary, // Highlight inflow
-                ),
+              CurrencyText(
+                symbol: '${isCredit ? '+' : '-'}$symbol',
+                amount: convertAmount.toStringAsFixed(2),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: isCredit
+                    ? AppColors.success
+                    : AppColors.textPrimary, // Highlight inflow
               ),
               const SizedBox(height: 2),
               Text(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/currency_text.dart';
 
 class PortfolioSummaryCard extends StatefulWidget {
   final double totalBalance;
@@ -159,25 +160,25 @@ class _PortfolioSummaryCardState extends State<PortfolioSummaryCard>
                     );
                   },
                   child: widget.isVisible
-                      ? Text(
-                          '${widget.symbol}${widget.totalBalance.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                      ? CurrencyText(
                           key: ValueKey(widget.totalBalance),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.5,
-                          ),
+                          symbol: widget.symbol,
+                          amount: widget.totalBalance
+                              .toStringAsFixed(2)
+                              .replaceAllMapped(
+                                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                  (Match m) => '${m[1]},'),
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         )
-                      : Text(
-                          '${widget.symbol} ••••••',
+                      : CurrencyText(
                           key: const ValueKey('hidden'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                          ),
+                          symbol: widget.symbol,
+                          amount: ' ••••••',
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                 ),
                 const SizedBox(height: 8),

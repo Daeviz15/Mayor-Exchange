@@ -10,7 +10,6 @@ import '../widgets/gift_card_item.dart';
 import 'sell_giftcard_screen.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/search_bar_widget.dart';
-import '../../auth/providers/auth_providers.dart';
 
 /// Gift Cards Screen
 /// Main screen for browsing and searching gift cards
@@ -25,6 +24,7 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = GiftCardCategory.all;
   String _searchQuery = '';
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -51,6 +51,21 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
     });
   }
 
+  /// Handle pull-to-refresh
+  Future<void> _onRefresh() async {
+    setState(() => _isRefreshing = true);
+
+    try {
+      await refreshGiftCards(ref);
+      // Small delay to show the loader
+      await Future.delayed(const Duration(milliseconds: 500));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
   /// Filter cards based on search and category
   List<GiftCard> _filterCards(List<GiftCard> cards) {
     return cards.where((card) {
@@ -73,12 +88,11 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   @override
   Widget build(BuildContext context) {
     // Get user's preferred currency from their profile
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
+
     const userCurrency = 'NGN'; // Hardcoded - country selection coming in v2.0
 
-    // Watch gift cards from database
-    final giftCardsAsync = ref.watch(giftCardsFromDbProvider);
+    // Watch gift cards stream from database (real-time updates)
+    final giftCardsAsync = ref.watch(giftCardsStreamProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -86,7 +100,21 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
         child: giftCardsAsync.when(
           loading: () => const Center(child: RocketLoader()),
           error: (e, _) => Center(
-            child: Text('Error: $e', style: const TextStyle(color: Colors.red)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: $e', style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _onRefresh,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                  ),
+                  child: const Text('Retry',
+                      style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
           ),
           data: (allCards) {
             final filteredCards = _filterCards(allCards);
@@ -127,21 +155,36 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
                               style: AppTextStyles.headlineMedium(context)),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.backgroundCard,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          userCurrency,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                      Row(
+                        children: [
+                          // Refresh indicator
+                          if (_isRefreshing)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: RocketLoader(
+                                    size: 20, color: AppColors.primaryOrange),
+                              ),
+                            ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.backgroundCard,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              userCurrency,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -180,43 +223,66 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
 
                 const SizedBox(height: 24),
 
-                // Gift Cards Grid
+                // Gift Cards Grid with Pull-to-Refresh
                 Expanded(
-                  child: filteredCards.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                  child: RefreshIndicator(
+                    onRefresh: _onRefresh,
+                    color: AppColors.primaryOrange,
+                    backgroundColor: AppColors.backgroundCard,
+                    child: filteredCards.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              Icon(Icons.search_off,
-                                  size: 64, color: AppColors.textTertiary),
-                              const SizedBox(height: 16),
-                              Text('No gift cards found',
-                                  style: AppTextStyles.titleMedium(context)
-                                      .copyWith(color: AppColors.textTertiary)),
-                              const SizedBox(height: 8),
-                              Text('Try a different search or category',
-                                  style: AppTextStyles.bodyMedium(context)),
+                              SizedBox(
+                                  height: MediaQuery.of(context).size.height *
+                                      0.15),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.search_off,
+                                        size: 64,
+                                        color: AppColors.textTertiary),
+                                    const SizedBox(height: 16),
+                                    Text('No gift cards found',
+                                        style: AppTextStyles.titleMedium(
+                                                context)
+                                            .copyWith(
+                                                color: AppColors.textTertiary)),
+                                    const SizedBox(height: 8),
+                                    Text('Try a different search or category',
+                                        style:
+                                            AppTextStyles.bodyMedium(context)),
+                                    const SizedBox(height: 24),
+                                    Text('Pull down to refresh',
+                                        style: AppTextStyles.bodySmall(context)
+                                            .copyWith(
+                                                color: AppColors.textTertiary)),
+                                  ],
+                                ),
+                              ),
                             ],
+                          )
+                        : GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.75,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 20,
+                            ),
+                            itemCount: filteredCards.length,
+                            itemBuilder: (context, index) {
+                              return GiftCardItem(
+                                giftCard: filteredCards[index],
+                                onTap: () =>
+                                    _showGiftCardDetails(filteredCards[index]),
+                              );
+                            },
                           ),
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.75,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 20,
-                          ),
-                          itemCount: filteredCards.length,
-                          itemBuilder: (context, index) {
-                            return GiftCardItem(
-                              giftCard: filteredCards[index],
-                              onTap: () =>
-                                  _showGiftCardDetails(filteredCards[index]),
-                            );
-                          },
-                        ),
+                  ),
                 ),
               ],
             );
@@ -256,34 +322,62 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
               decoration: BoxDecoration(
                 color: giftCard.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                image: giftCard.imageUrl != null &&
-                        giftCard.imageUrl!.isNotEmpty
-                    ? DecorationImage(
-                        image: CachedNetworkImageProvider(giftCard.imageUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
               ),
-              child: giftCard.imageUrl != null && giftCard.imageUrl!.isNotEmpty
-                  ? null
-                  : Center(
-                      child: giftCard.logoText != null
-                          ? Text(
-                              giftCard.logoText!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : giftCard.icon != null
-                              ? Icon(
-                                  giftCard.icon,
-                                  color: Colors.white,
-                                  size: 48,
-                                )
-                              : const SizedBox(),
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child:
+                    giftCard.imageUrl != null && giftCard.imageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: giftCard.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Center(
+                              child: giftCard.logoText != null
+                                  ? Text(
+                                      giftCard.logoText!,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : const RocketLoader(
+                                      size: 24, color: Colors.white),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: giftCard.logoText != null
+                                  ? Text(
+                                      giftCard.logoText!,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : giftCard.icon != null
+                                      ? Icon(giftCard.icon,
+                                          color: Colors.white, size: 48)
+                                      : const SizedBox(),
+                            ),
+                          )
+                        : Center(
+                            child: giftCard.logoText != null
+                                ? Text(
+                                    giftCard.logoText!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : giftCard.icon != null
+                                    ? Icon(
+                                        giftCard.icon,
+                                        color: Colors.white,
+                                        size: 48,
+                                      )
+                                    : const SizedBox(),
+                          ),
+              ),
             ),
             const SizedBox(height: 24),
             Text(

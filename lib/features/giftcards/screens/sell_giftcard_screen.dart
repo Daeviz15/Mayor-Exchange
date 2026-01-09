@@ -8,7 +8,8 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
 import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
-import '../../auth/providers/auth_providers.dart';
+import '../../../core/widgets/currency_text.dart';
+
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/services/forex_service.dart';
@@ -99,8 +100,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
     final isTradable = buyRate > 0;
 
     // Get user's currency
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
+
     const userCurrency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.read(forexServiceProvider);
     final currencySymbol = _getCurrencySymbol(userCurrency);
@@ -202,10 +202,17 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                               Builder(builder: (context) {
                                 final rateInUserCurrency =
                                     getRateInUserCurrency(buyRate);
-                                return Text(
-                                  '$currencySymbol${rateInUserCurrency.toStringAsFixed(2)} per \$1',
-                                  style: AppTextStyles.titleMedium(context)
-                                      .copyWith(color: AppColors.primaryOrange),
+                                return Row(
+                                  children: [
+                                    CurrencyText(
+                                      symbol: currencySymbol,
+                                      amount:
+                                          '${rateInUserCurrency.toStringAsFixed(2)} per \$1',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryOrange,
+                                    ),
+                                  ],
                                 );
                               }),
                             ],
@@ -399,11 +406,12 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                             final amountNGN = _cardValueUSD * buyRate;
                             final amountUser =
                                 forexService.convert(amountNGN, userCurrency);
-                            return Text(
-                              '$currencySymbol${amountUser.toStringAsFixed(2)}',
-                              style: AppTextStyles.titleLarge(context).copyWith(
-                                color: AppColors.primaryOrange,
-                              ),
+                            return CurrencyText(
+                              symbol: currencySymbol,
+                              amount: amountUser.toStringAsFixed(2),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryOrange,
                             );
                           }),
                         ],
@@ -462,8 +470,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
     final fiatAmountNGN = _cardValueUSD * rate;
 
     // Get user's currency for display
-    final authState = ref.read(authControllerProvider);
-    final user = authState.asData?.value;
+
     const userCurrency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.read(forexServiceProvider);
     final fiatInUserCurrency =
@@ -628,7 +635,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
 
   String _getCurrencySymbol(String currencyCode) {
     if (currencyCode == 'USD') return '\$';
-    if (currencyCode == 'NGN') return '₦';
+    if (currencyCode == 'NGN') return '\u20A6';
     if (currencyCode == 'EUR') return '€';
     if (currencyCode == 'GBP') return '£';
     return currencyCode;
@@ -636,21 +643,47 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
 
   Widget _buildConfirmRow(String label, String value,
       {bool highlight = false}) {
+    // Detect if the value is a currency string (starts with $, \u20A6, etc.)
+    final isCurrency = value.startsWith('\$') || value.startsWith('\u20A6');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: AppColors.textSecondary)),
-          Text(
-            value,
-            style: TextStyle(
-              color: highlight ? AppColors.primaryOrange : Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: highlight ? 18 : 14,
-            ),
-          ),
+          isCurrency
+              ? _buildCurrencyValue(value, highlight)
+              : Text(
+                  value,
+                  style: TextStyle(
+                    color: highlight ? AppColors.primaryOrange : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: highlight ? 18 : 14,
+                  ),
+                ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCurrencyValue(String value, bool highlight) {
+    // Split symbol and amount (e.g., "$50" or "₦1450.00/$1")
+    String symbol = '';
+    String amount = '';
+
+    if (value.startsWith('\$') || value.startsWith('\u20A6')) {
+      symbol = value.substring(0, 1);
+      amount = value.substring(1);
+    }
+
+    return CurrencyText(
+      symbol: symbol,
+      amount: amount,
+      style: TextStyle(
+        color: highlight ? AppColors.primaryOrange : Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: highlight ? 18 : 14,
       ),
     );
   }

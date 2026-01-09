@@ -1,7 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -83,7 +82,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const SizedBox(height: 20),
               Text(
                 'Reset Password',
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(
+                  fontFamily: 'Host Grotesk',
+                  fontFamilyFallback: ['Roboto', 'Noto Sans'],
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -92,7 +93,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const SizedBox(height: 8),
               Text(
                 'Enter your registered email to receive a verification code',
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(
+                  fontFamily: 'Host Grotesk',
+                  fontFamilyFallback: ['Roboto', 'Noto Sans'],
                   fontSize: 16,
                   color: AppColors.textSecondary,
                 ),
@@ -105,7 +108,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   children: [
                     Text(
                       'Email Address',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
+                        fontFamily: 'Host Grotesk',
+                        fontFamilyFallback: ['Roboto', 'Noto Sans'],
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -171,7 +176,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         )
                       : Text(
                           'Send Reset Code',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(
+                            fontFamily: 'Host Grotesk',
+                            fontFamilyFallback: ['Roboto', 'Noto Sans'],
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -184,14 +191,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 child: RichText(
                   text: TextSpan(
                     text: 'Remember your password? ',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(
+                      fontFamily: 'Host Grotesk',
+                      fontFamilyFallback: ['Roboto', 'Noto Sans'],
                       color: AppColors.textSecondary,
                       fontSize: 14,
                     ),
                     children: [
                       TextSpan(
                         text: 'Log In',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
+                          fontFamily: 'Host Grotesk',
+                          fontFamilyFallback: ['Roboto', 'Noto Sans'],
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.w600,
                         ),

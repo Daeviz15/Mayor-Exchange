@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/rocket_loader.dart';
 import '../models/gift_card.dart';
 
 /// Gift Card Item Widget
@@ -77,12 +78,26 @@ class GiftCardItem extends StatelessWidget {
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        placeholder: (context, url) => _buildFallbackContent(),
+        // Use unique key based on URL to force refresh when URL changes
+        cacheKey: giftCard.imageUrl,
+        placeholder: (context, url) => _buildLoadingContent(),
         errorWidget: (context, url, error) => _buildFallbackContent(),
+        fadeInDuration: const Duration(milliseconds: 200),
+        fadeOutDuration: const Duration(milliseconds: 200),
       );
     }
 
     return _buildFallbackContent();
+  }
+
+  /// Build loading content while image loads
+  Widget _buildLoadingContent() {
+    return Container(
+      color: giftCard.cardColor,
+      child: const Center(
+        child: RocketLoader(size: 24, color: Colors.white),
+      ),
+    );
   }
 
   /// Build fallback content (logo text or icon)

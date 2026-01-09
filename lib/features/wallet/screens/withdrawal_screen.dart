@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/currency_text.dart';
 import '../providers/wallet_provider.dart';
 import '../../dasboard/providers/balance_provider.dart';
 import '../../transactions/services/forex_service.dart';
@@ -137,12 +138,12 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
                         Text('Available Balance',
                             style: AppTextStyles.bodySmall(context)),
                         const SizedBox(height: 8),
-                        Text(
-                          '$symbol${convertedBalance.toStringAsFixed(2)}',
-                          style: AppTextStyles.headlineMedium(context).copyWith(
-                            color: AppColors.primaryOrange,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        CurrencyText(
+                          symbol: symbol,
+                          amount: convertedBalance.toStringAsFixed(2),
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryOrange,
                         ),
                       ],
                     ),

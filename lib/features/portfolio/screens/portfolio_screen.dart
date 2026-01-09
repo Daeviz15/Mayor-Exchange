@@ -5,7 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/animations/fade_in_slide.dart';
 import '../providers/portfolio_provider.dart';
 import '../widgets/portfolio_summary_card.dart';
-import '../../auth/providers/auth_providers.dart';
+
 import '../../transactions/services/forex_service.dart';
 import '../../wallet/screens/withdrawal_screen.dart';
 import '../../dasboard/widgets/transaction_short_list.dart';
@@ -23,8 +23,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   @override
   Widget build(BuildContext context) {
     final portfolioState = ref.watch(portfolioProvider);
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.asData?.value;
 
     const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     // Use ForexService for conversion

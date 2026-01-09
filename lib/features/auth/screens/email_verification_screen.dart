@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:pinput/pinput.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -117,7 +117,9 @@ class _EmailVerificationScreenState
     final defaultPinTheme = PinTheme(
       width: 50,
       height: 50,
-      textStyle: GoogleFonts.plusJakartaSans(
+      textStyle: TextStyle(
+        fontFamily: 'Host Grotesk',
+        fontFamilyFallback: ['Roboto', 'Noto Sans'],
         fontSize: 20,
         color: AppColors.textPrimary,
         fontWeight: FontWeight.w600,
@@ -158,7 +160,9 @@ class _EmailVerificationScreenState
               const SizedBox(height: 20),
               Text(
                 'Verify Email',
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(
+                  fontFamily: 'Host Grotesk',
+                  fontFamilyFallback: ['Roboto', 'Noto Sans'],
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -168,7 +172,9 @@ class _EmailVerificationScreenState
               Text(
                 'Enter the verification code sent to\n${widget.email}',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(
+                  fontFamily: 'Host Grotesk',
+                  fontFamilyFallback: ['Roboto', 'Noto Sans'],
                   fontSize: 16,
                   color: AppColors.textSecondary,
                   height: 1.5,
@@ -217,7 +223,9 @@ class _EmailVerificationScreenState
                         )
                       : Text(
                           'Verify & Continue',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(
+                            fontFamily: 'Host Grotesk',
+                            fontFamilyFallback: ['Roboto', 'Noto Sans'],
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -229,7 +237,9 @@ class _EmailVerificationScreenState
               RichText(
                 text: TextSpan(
                   text: "Didn't receive code? ",
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
+                    fontFamily: 'Host Grotesk',
+                    fontFamilyFallback: ['Roboto', 'Noto Sans'],
                     color: AppColors.textSecondary,
                     fontSize: 14,
                   ),
@@ -237,7 +247,9 @@ class _EmailVerificationScreenState
                     if (_resendTimer > 0)
                       TextSpan(
                         text: 'Resend in ${_resendTimer}s',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
+                          fontFamily: 'Host Grotesk',
+                          fontFamilyFallback: ['Roboto', 'Noto Sans'],
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.w600,
                         ),
@@ -245,7 +257,9 @@ class _EmailVerificationScreenState
                     else
                       TextSpan(
                         text: 'Resend',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
+                          fontFamily: 'Host Grotesk',
+                          fontFamilyFallback: ['Roboto', 'Noto Sans'],
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.w600,
                         ),

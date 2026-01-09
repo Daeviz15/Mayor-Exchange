@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/currency_text.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/repositories/transaction_repository.dart';
 import 'admin_transaction_detail_screen.dart';
@@ -239,9 +240,20 @@ class _TransactionCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        title: Text(
-          '${transaction.type.name.toUpperCase()} - ${transaction.details['currency_symbol'] ?? '₦'}${transaction.amountFiat}',
-          style: AppTextStyles.titleSmall(context),
+        title: Row(
+          children: [
+            Text(
+              '${transaction.type.name.toUpperCase()} – ',
+              style: AppTextStyles.titleSmall(context),
+            ),
+            CurrencyText(
+              symbol: transaction.details['currency_symbol'] ?? '₦',
+              amount: transaction.amountFiat.toString(),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

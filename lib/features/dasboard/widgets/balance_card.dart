@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/currency_text.dart';
 
 /// Balance Card Widget
 /// Displays user's total balance with authenticated eye toggle animation
@@ -119,22 +120,21 @@ class _BalanceCardState extends State<BalanceCard>
                         duration: const Duration(milliseconds: 1200),
                         curve: Curves.easeOutCubic,
                         builder: (context, animatedValue, child) {
-                          return Text(
-                            '${widget.symbol}${animatedValue.toStringAsFixed(2)}',
-                            style:
-                                AppTextStyles.headlineLarge(context).copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 32,
-                            ),
+                          return CurrencyText(
+                            symbol: widget.symbol,
+                            amount: animatedValue.toStringAsFixed(2),
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           );
                         },
                       ),
-                      secondChild: Text(
-                        '${widget.symbol} ****.**',
-                        style: AppTextStyles.headlineLarge(context).copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 32,
-                        ),
+                      secondChild: CurrencyText(
+                        symbol: widget.symbol,
+                        amount: ' ****.**',
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                       crossFadeState: _isBalanceVisible
                           ? CrossFadeState.showFirst
