@@ -12,6 +12,8 @@ import 'package:mayor_exchange/features/transactions/providers/transaction_servi
 import '../../auth/providers/auth_providers.dart';
 import '../../giftcards/models/gift_card.dart';
 import '../../giftcards/data/gift_cards_data.dart';
+import '../../chat/screens/transaction_chat_screen.dart';
+import '../../chat/providers/chat_provider.dart';
 
 class BuyerTransactionStatusScreen extends ConsumerStatefulWidget {
   final String transactionId;
@@ -143,6 +145,10 @@ class _BuyerTransactionStatusScreenState
           backgroundColor: AppColors.backgroundCard,
           title: const Text('Transaction Details'),
           centerTitle: true,
+          actions: [
+            // Chat button with unread badge
+            _buildChatButton(transaction),
+          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -279,6 +285,62 @@ class _BuyerTransactionStatusScreenState
     );
   }
 
+  /// Chat button with unread message badge
+  Widget _buildChatButton(TransactionModel transaction) {
+    final unreadAsync = ref.watch(unreadCountStreamProvider(transaction.id));
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chat_bubble_outline,
+              color: AppColors.primaryOrange),
+          tooltip: 'Chat with Support',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TransactionChatScreen(
+                  transactionId: transaction.id,
+                  transactionTitle: 'Support Chat',
+                  transactionDetails: transaction.details,
+                ),
+              ),
+            );
+          },
+        ),
+        // Unread badge
+        unreadAsync.when(
+          data: (count) => count > 0
+              ? Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      count > 9 ? '9+' : '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildheader(TransactionModel transaction) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -326,6 +388,8 @@ class _BuyerTransactionStatusScreenState
                       color: AppColors.textSecondary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
+                      fontFamily: 'Roboto',
+                      fontFamilyFallback: ['Noto Sans', 'Arial'],
                     ),
                   ),
                 ),
@@ -498,13 +562,20 @@ class _BuyerTransactionStatusScreenState
         );
 
       case TransactionStatus.verificationPending:
-        // Case 3: Proof Uploaded -> Waiting for Admin
+        // Case 3: Waiting for Admin Verification
+        // Different messages for buy vs sell transactions
+        final isSellTransaction =
+            transaction.type == TransactionType.sellGiftCard ||
+                transaction.type == TransactionType.sellCrypto;
+
         return _buildStatusCard(
           icon: Icons.safety_check,
           color: Colors.purple,
-          title: 'Verifying Payment',
-          description:
-              'We have received your proof of payment. An agent is verifying it right now. Your asset will be released shortly.',
+          title:
+              isSellTransaction ? 'Verifying Your Card' : 'Verifying Payment',
+          description: isSellTransaction
+              ? 'We are reviewing your gift card details. An agent is verifying it right now. Your payment will be processed shortly.'
+              : 'We have received your proof of payment. An agent is verifying it right now. Your asset will be released shortly.',
         );
 
       case TransactionStatus.completed:

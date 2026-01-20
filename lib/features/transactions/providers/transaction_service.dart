@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../admin/providers/admin_history_provider.dart'; // Import PaginatedState
 import '../../auth/models/app_user.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
@@ -17,12 +18,20 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
   return TransactionService(repository, user, supabaseClient);
 });
 
-final userTransactionsProvider =
-    AsyncNotifierProvider<UserTransactionsNotifier, List<TransactionModel>>(() {
-  return UserTransactionsNotifier();
+final recentUserTransactionsProvider = AsyncNotifierProvider<
+    RecentUserTransactionsNotifier, List<TransactionModel>>(() {
+  return RecentUserTransactionsNotifier();
 });
 
-class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
+// Added for backward compatibility if needed, or better to deprecate
+final userTransactionsProvider = recentUserTransactionsProvider;
+
+final userHistoryProvider =
+    AsyncNotifierProvider<UserHistoryNotifier, PaginatedState>(
+        UserHistoryNotifier.new);
+
+class RecentUserTransactionsNotifier
+    extends AsyncNotifier<List<TransactionModel>> {
   StreamSubscription<List<TransactionModel>>? _subscription;
 
   @override
@@ -71,7 +80,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
     // Subscribe to stream
     _subscription = ref
         .read(transactionRepositoryProvider)
-        .watchUserTransactions(userId)
+        .watchUserTransactions(userId, limit: 20) // Optimized: Limit to 20
         .listen((data) async {
       state = AsyncData(data);
       _cacheTransactions(data);
@@ -88,7 +97,7 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
     try {
       final transactions = await ref
           .read(transactionRepositoryProvider)
-          .watchUserTransactions(userId)
+          .watchUserTransactions(userId, limit: 20) // Optimized: Limit to 20
           .first;
 
       state = AsyncData(transactions);
@@ -113,6 +122,57 @@ class UserTransactionsNotifier extends AsyncNotifier<List<TransactionModel>> {
   }
 }
 
+// Paginated State for User History
+class UserHistoryNotifier extends AsyncNotifier<PaginatedState> {
+  static const int _pageSize = 20;
+
+  @override
+  Future<PaginatedState> build() async {
+    return _fetchPage(0, const PaginatedState());
+  }
+
+  Future<PaginatedState> _fetchPage(
+      int page, PaginatedState currentState) async {
+    final userId = ref.read(authControllerProvider).asData?.value?.id;
+    if (userId == null) return const PaginatedState();
+
+    final service = ref.read(transactionServiceProvider);
+    final newItems = await service.getTransactionsPaginated(
+      page: page,
+      pageSize: _pageSize,
+      userId: userId,
+    );
+
+    return currentState.copyWith(
+      transactions: [...currentState.transactions, ...newItems],
+      page: page + 1,
+      hasMore: newItems.length >= _pageSize,
+      isFetchingNext: false,
+    );
+  }
+
+  Future<void> loadNextPage() async {
+    final currentState = state.value;
+    if (currentState == null ||
+        !currentState.hasMore ||
+        currentState.isFetchingNext) return;
+
+    state = AsyncData(currentState.copyWith(isFetchingNext: true));
+
+    try {
+      final newState = await _fetchPage(currentState.page, currentState);
+      state = AsyncData(newState);
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = AsyncData(await _fetchPage(0, const PaginatedState()));
+  }
+}
+
 // Top-level function for isolate decoding
 List<TransactionModel> _decodeTransactions(String jsonString) {
   final List<dynamic> jsonList = jsonDecode(jsonString);
@@ -126,9 +186,15 @@ String _encodeTransactions(List<TransactionModel> transactions) {
   return jsonEncode(transactions.map((e) => e.toJson()).toList());
 }
 
+final adminTransactionsByStatusProvider =
+    StreamProvider.family<List<TransactionModel>, List<TransactionStatus>>(
+        (ref, statuses) {
+  return ref
+      .watch(transactionRepositoryProvider)
+      .watchTransactionsByStatusList(statuses);
+});
+
 final adminTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
-  // TODO: Verify admin role here or in repository policy?
-  // RLS protects the data, but we can also return empty if not admin logic in UI.
   return ref.watch(transactionRepositoryProvider).watchAllTransactions();
 });
 
@@ -175,38 +241,19 @@ class TransactionService {
       updatedAt: DateTime.now(), // DB will override
     );
 
-    // Debug removed
     // Create Transaction
-    TransactionModel created;
-    try {
-      created = await _repository
-          .createTransaction(transaction)
-          .timeout(const Duration(seconds: 15));
-      // Debug removed
-    } catch (e) {
-      // Debug removed
-      rethrow;
-    }
+    TransactionModel created = await _repository.createTransaction(transaction);
 
-    // Log creation (Fire and forget or minimal wait to prevent blocking UI if logs fail)
-    try {
-      await _repository
-          .createLog(
-            transactionId: created.id,
-            actorId: _currentUser!.id,
-            newStatus: TransactionStatus.pending,
-            note: 'Request submitted',
-          )
-          .timeout(const Duration(seconds: 5));
-    } catch (e) {
-      // Debug removed
-      // Don't fail the transaction just because log failed
-    }
+    // Log creation
+    await _repository.createLog(
+      transactionId: created.id,
+      actorId: _currentUser!.id,
+      newStatus: TransactionStatus.pending,
+      note: 'Request submitted',
+    );
 
     return created;
   }
-
-// ... (keep class definition)
 
   /// Admin Claims a Request
   Future<void> claimRequest(String transactionId, String targetUserId) async {
@@ -214,10 +261,7 @@ class TransactionService {
 
     await _repository.claimTransaction(transactionId, _currentUser!.id);
 
-    // Snapshot admin name
     final adminName = _currentUser!.fullName ?? 'Admin Agent';
-
-    // RE-IMPLEMENTATION OF CLAIM:
     final tx = await _supabaseClient
         .from('transactions')
         .select('details')
@@ -251,13 +295,6 @@ class TransactionService {
     );
   }
 
-  /// Update Payment Status (Admin confirms payment sent/received)
-  Future<void> markPaymentSent(String transactionId,
-      {String? proofPath, String? note}) async {
-    if (_currentUser == null) throw Exception('User not logged in');
-    // Logic: Move to 'payment_pending' or 'verification_pending' depends on flow.
-  }
-
   /// Admin Accepts Request & Provides Bank Details (Buy Flow)
   Future<void> adminAcceptRequest({
     required String transactionId,
@@ -267,7 +304,6 @@ class TransactionService {
   }) async {
     if (_currentUser == null) throw Exception('User not logged in');
 
-    // Fetch current details to merge
     final tx = await _supabaseClient
         .from('transactions')
         .select('details')
@@ -277,7 +313,6 @@ class TransactionService {
     final newDetails = {...currentDetails, 'admin_bank_details': bankDetails};
     newDetails['admin_name'] = _currentUser!.fullName ?? 'Admin Agent';
 
-    // Update Transaction
     await _supabaseClient.from('transactions').update({
       'status': TransactionStatus.paymentPending.value,
       'details': newDetails,
@@ -285,7 +320,6 @@ class TransactionService {
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', transactionId);
 
-    // Create Log
     await _repository.createLog(
       transactionId: transactionId,
       actorId: _currentUser!.id,
@@ -294,7 +328,6 @@ class TransactionService {
       note: 'Admin accepted request and provided account details',
     );
 
-    // Notify User
     await _createNotification(
       userId: targetUserId,
       title: 'Order Accepted',
@@ -312,14 +345,12 @@ class TransactionService {
   }) async {
     if (_currentUser == null) throw Exception('User not logged in');
 
-    // Update Transaction
     await _repository.updateStatus(
       transactionId: transactionId,
       newStatus: TransactionStatus.verificationPending,
       proofPath: proofPath,
     );
 
-    // Create Log
     await _repository.createLog(
       transactionId: transactionId,
       actorId: _currentUser!.id,
@@ -327,78 +358,56 @@ class TransactionService {
       previousStatus: TransactionStatus.paymentPending,
       note: 'User submitted proof of payment',
     );
-
-    // Note: In a real app we'd notify the specific admin or all admins here
   }
 
-  // Generic status update
   Future<void> updateStatus({
     required String transactionId,
-    required String targetUserId, // Added for notification
+    required String targetUserId,
     required TransactionStatus newStatus,
     required TransactionStatus previousStatus,
     String? note,
     String? proofPath,
-    String? notificationMessage, // Custom override
+    String? notificationMessage,
     Map<String, dynamic>? details,
     double? finalPayoutAmount,
   }) async {
     if (_currentUser == null) throw Exception('User not logged in');
 
-    // If we are updating the amountFiat, we should snapshot the original for records
     Map<String, dynamic>? effectiveDetails = details;
     if (finalPayoutAmount != null) {
-      // We don't have current transaction here easily without fetching.
-      // But we can assume if finalPayoutAmount is provided, we should save "original_amount_estimated" presumably?
-      // Actually, fetching is safer.
       final tx = await _supabaseClient
           .from('transactions')
           .select('amount_fiat, details')
           .eq('id', transactionId)
-          .maybeSingle(); // Use maybeSingle to be safe
+          .maybeSingle();
 
       if (tx != null) {
         final currentAmount = (tx['amount_fiat'] as num).toDouble();
         final currentDetails = Map<String, dynamic>.from(tx['details'] ?? {});
-
-        // Only snapshot if not already done
         if (!currentDetails.containsKey('original_amount_fiat')) {
           currentDetails['original_amount_fiat'] = currentAmount;
         }
-
-        // Merge with incoming details
         effectiveDetails = {...currentDetails, ...(details ?? {})};
       }
     }
 
-    // Auto-snapshot admin name if we are setting adminId (implying admin action)
-    // or if the actor has a role (but we strictly know _currentUser is the actor here).
-    // If details are being updated and we are an admin, ensure name is fresh.
     if (newStatus != TransactionStatus.pending &&
-        newStatus !=
-            TransactionStatus.verificationPending && // User triggers this
+        newStatus != TransactionStatus.verificationPending &&
         newStatus != TransactionStatus.cancelled) {
-      // This is likely an admin action (completed, rejected, paymentPending etc)
       if (effectiveDetails == null) {
-        // Need to fetch details to add name if not present
         final tx = await _supabaseClient
             .from('transactions')
             .select('details')
             .eq('id', transactionId)
             .maybeSingle();
-        if (tx != null) {
-          effectiveDetails = Map<String, dynamic>.from(tx['details'] ?? {});
-        } else {
-          effectiveDetails = {};
-        }
+        effectiveDetails =
+            tx != null ? Map<String, dynamic>.from(tx['details'] ?? {}) : {};
       }
       effectiveDetails['admin_name'] = _currentUser!.fullName ?? 'Admin Agent';
     }
 
-    // Save note to details so it is visible to user
     if (note != null && note.isNotEmpty) {
       if (effectiveDetails == null) {
-        // Fetch details if we haven't already
         final tx = await _supabaseClient
             .from('transactions')
             .select('details')
@@ -414,7 +423,7 @@ class TransactionService {
       transactionId: transactionId,
       newStatus: newStatus,
       proofPath: proofPath,
-      details: effectiveDetails ?? details, // Use merged details
+      details: effectiveDetails ?? details,
       amountFiat: finalPayoutAmount,
     );
 
@@ -426,7 +435,6 @@ class TransactionService {
       note: note,
     );
 
-    // Notify User
     String message = notificationMessage ??
         'Your transaction status has been updated to ${newStatus.name.replaceAll('_', ' ')}.';
 
@@ -449,7 +457,6 @@ class TransactionService {
     );
   }
 
-  /// Fetch rejection/cancellation reason from logs (Fallback)
   Future<String?> getRejectionReason(String transactionId) async {
     try {
       final logs = await _repository.getTransactionLogs(transactionId);
@@ -465,6 +472,22 @@ class TransactionService {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Get paginated transactions for history
+  /// Get paginated transactions for history
+  Future<List<TransactionModel>> getTransactionsPaginated({
+    required int page,
+    required int pageSize,
+    TransactionStatus? status,
+    String? userId,
+  }) {
+    return _repository.getTransactionsPaginated(
+      page: page,
+      pageSize: pageSize,
+      status: status,
+      userId: userId,
+    );
   }
 
   Future<void> _createNotification({
@@ -484,8 +507,7 @@ class TransactionService {
         'is_read': false,
       });
     } catch (e) {
-      // Fail silently regarding notifications so transaction doesn't fail
-      // Debug removed
+      // Fail silently
     }
   }
 }

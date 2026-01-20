@@ -50,9 +50,11 @@ class TransactionModel {
   final double? amountCrypto;
   final String currencyPair;
   final String? proofImagePath;
+  final List<String> adminProofImages; // Images uploaded by admin
   final Map<String, dynamic> details;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? claimedAt; // When admin claimed this transaction
 
   TransactionModel({
     required this.id,
@@ -65,9 +67,19 @@ class TransactionModel {
     required this.currencyPair,
     required this.details,
     this.proofImagePath,
+    this.adminProofImages = const [],
     required this.createdAt,
     required this.updatedAt,
+    this.claimedAt,
   });
+
+  /// Check if this transaction is claimed by any admin
+  bool get isClaimed => adminId != null && claimedAt != null;
+
+  /// Check if claimed by a different admin (pass current admin ID)
+  bool isClaimedByOther(String currentAdminId) {
+    return isClaimed && adminId != currentAdminId;
+  }
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
@@ -81,9 +93,21 @@ class TransactionModel {
       currencyPair: json['currency_pair'] as String,
       details: json['details'] as Map<String, dynamic>,
       proofImagePath: json['proof_image_path'] as String?,
+      adminProofImages: _parseStringList(json['admin_proof_images']),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      claimedAt: json['claimed_at'] != null
+          ? DateTime.parse(json['claimed_at'] as String)
+          : null,
     );
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+    return [];
   }
 
   Map<String, dynamic> toJson() {
@@ -98,8 +122,10 @@ class TransactionModel {
       'currency_pair': currencyPair,
       'details': details,
       'proof_image_path': proofImagePath,
+      'admin_proof_images': adminProofImages,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'claimed_at': claimedAt?.toIso8601String(),
     };
   }
 
@@ -114,8 +140,10 @@ class TransactionModel {
     String? currencyPair,
     Map<String, dynamic>? details,
     String? proofImagePath,
+    List<String>? adminProofImages,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? claimedAt,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -128,8 +156,10 @@ class TransactionModel {
       currencyPair: currencyPair ?? this.currencyPair,
       details: details ?? this.details,
       proofImagePath: proofImagePath ?? this.proofImagePath,
+      adminProofImages: adminProofImages ?? this.adminProofImages,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      claimedAt: claimedAt ?? this.claimedAt,
     );
   }
 }

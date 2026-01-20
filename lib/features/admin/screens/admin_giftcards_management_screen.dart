@@ -10,6 +10,7 @@ import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../../giftcards/providers/gift_cards_providers.dart';
 import '../../giftcards/models/gift_card.dart';
+import '../../giftcards/models/gift_card_variant.dart';
 
 /// Admin screen for managing gift cards (add/edit/delete with image upload)
 class AdminGiftCardsManagementScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,8 @@ class _AdminGiftCardsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final giftCardsAsync = ref.watch(giftCardsFromDbProvider);
+    // Use admin provider to see ALL cards (including inactive ones)
+    final giftCardsAsync = ref.watch(adminGiftCardsFromDbProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -82,7 +84,7 @@ class _AdminGiftCardsManagementScreenState
           return RefreshIndicator(
             onRefresh: () async {
               _clearImageCaches();
-              ref.invalidate(giftCardsFromDbProvider);
+              ref.invalidate(adminGiftCardsFromDbProvider);
               await Future.delayed(const Duration(milliseconds: 300));
             },
             color: AppColors.primaryOrange,
@@ -135,12 +137,29 @@ class _AdminGiftCardsManagementScreenState
         ),
         title: Text(card.name, style: AppTextStyles.titleSmall(context)),
         subtitle: Text(
-          '${card.category} • ${card.hasImage ? "Has image" : "No image"}',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          '${card.category} • ${card.hasImage ? "Has image" : "No image"}${!card.isActive ? " • INACTIVE" : ""}',
+          style: TextStyle(
+            color: card.isActive ? AppColors.textSecondary : Colors.orange,
+            fontSize: 12,
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (card.id == 'apple')
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.primaryOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  icon: const Icon(Icons.list_alt,
+                      color: AppColors.primaryOrange),
+                  onPressed: () => _showVariantsDialog(context),
+                  tooltip: 'Manage Variants',
+                ),
+              ),
             IconButton(
               icon: const Icon(Icons.edit, color: AppColors.primaryOrange),
               onPressed: () => _showAddEditDialog(context, card),
@@ -170,6 +189,18 @@ class _AdminGiftCardsManagementScreenState
 
   Future<void> _showAddEditDialog(BuildContext context, GiftCard? card) async {
     final isEdit = card != null;
+
+    // Debug: Print card data to verify what we're receiving
+    if (card != null) {
+      debugPrint('=== ADMIN EDIT DIALOG ===');
+      debugPrint('Card: ${card.name}');
+      debugPrint('Physical Rate: ${card.physicalRate}');
+      debugPrint('E-code Rate: ${card.ecodeRate}');
+      debugPrint('Min Value: ${card.minValue}');
+      debugPrint('Max Value: ${card.maxValue}');
+      debugPrint('=========================');
+    }
+
     final idController = TextEditingController(text: card?.id ?? '');
     final nameController = TextEditingController(text: card?.name ?? '');
     final categoryController =
@@ -185,10 +216,24 @@ class _AdminGiftCardsManagementScreenState
         TextEditingController(text: card?.redemptionUrl ?? '');
     final rateController = TextEditingController(
         text: card != null && card.buyRate > 0 ? card.buyRate.toString() : '');
+    // Always show the rate values (even if 0) so admin knows what's set
+    final physicalRateController =
+        TextEditingController(text: card?.physicalRate.toString() ?? '');
+    final ecodeRateController =
+        TextEditingController(text: card?.ecodeRate.toString() ?? '');
+    final minValueController = TextEditingController(
+        text: card != null ? card.minValue.toString() : '5');
+    final maxValueController = TextEditingController(
+        text: card != null ? card.maxValue.toString() : '500');
+    final denominationsController = TextEditingController(
+        text: card != null && card.allowedDenominations.isNotEmpty
+            ? card.allowedDenominations.map((d) => d.toInt()).join(', ')
+            : '');
 
     File? selectedImage;
     String? currentImageUrl = card?.imageUrl;
     bool isUploading = false;
+    bool isActive = card?.isActive ?? true;
 
     await showDialog(
       context: context,
@@ -265,8 +310,54 @@ class _AdminGiftCardsManagementScreenState
                     hint: 'Fallback text'),
                 _buildField('Redemption URL', redemptionUrlController,
                     hint: 'Optional'),
-                _buildField('Buy Rate (\u20A6 per \$1)', rateController,
-                    hint: 'Rate you PAY the user (e.g. 1450)'),
+                const SizedBox(height: 8),
+                Text('Rates (\u20A6 per \$1)',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                        fontFamilyFallback: ['Roboto', 'Noto Sans'])),
+                const SizedBox(height: 8),
+                _buildField('E-Code Rate', ecodeRateController,
+                    hint: 'Digital code rate (e.g. 1450)'),
+                _buildField('Physical Rate', physicalRateController,
+                    hint: 'Physical card rate (usually lower)'),
+                const SizedBox(height: 12),
+                Text('Value Limits (USD)',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildField('Min Value', minValueController,
+                          hint: '5'),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildField('Max Value', maxValueController,
+                          hint: '500'),
+                    ),
+                  ],
+                ),
+                _buildField('Allowed Denominations', denominationsController,
+                    hint: 'e.g., 25, 50, 100 (blank = any)'),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Is Active',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text(
+                      'If disabled, this card will be hidden from users',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                  value: isActive,
+                  onChanged: (val) {
+                    setDialogState(() {
+                      isActive = val;
+                    });
+                  },
+                  activeColor: AppColors.primaryOrange,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ],
             ),
           ),
@@ -320,7 +411,20 @@ class _AdminGiftCardsManagementScreenState
                           redemptionUrl: redemptionUrlController.text.isEmpty
                               ? null
                               : redemptionUrlController.text,
-                          buyRate: double.tryParse(rateController.text) ?? 0,
+                          buyRate: double.tryParse(ecodeRateController.text) ??
+                              double.tryParse(rateController.text) ??
+                              0,
+                          physicalRate:
+                              double.tryParse(physicalRateController.text) ?? 0,
+                          ecodeRate:
+                              double.tryParse(ecodeRateController.text) ?? 0,
+                          minValue:
+                              double.tryParse(minValueController.text) ?? 5,
+                          maxValue:
+                              double.tryParse(maxValueController.text) ?? 500,
+                          allowedDenominations:
+                              _parseDenominations(denominationsController.text),
+                          isActive: isActive,
                           isEdit: isEdit,
                         );
 
@@ -328,6 +432,7 @@ class _AdminGiftCardsManagementScreenState
                         _clearImageCaches();
 
                         // Refresh the provider
+                        ref.invalidate(adminGiftCardsFromDbProvider);
                         ref.invalidate(giftCardsFromDbProvider);
 
                         if (mounted) {
@@ -441,6 +546,12 @@ class _AdminGiftCardsManagementScreenState
     String? imageUrl,
     String? redemptionUrl,
     double buyRate = 0,
+    double physicalRate = 0,
+    double ecodeRate = 0,
+    double minValue = 5,
+    double maxValue = 500,
+    List<double> allowedDenominations = const [],
+    bool isActive = true,
     required bool isEdit,
   }) async {
     final client = ref.read(supabaseClientProvider);
@@ -453,15 +564,35 @@ class _AdminGiftCardsManagementScreenState
       'logo_text': logoText,
       'image_url': imageUrl,
       'redemption_url': redemptionUrl,
-      'is_active': true,
+      'is_active': isActive,
       'buy_rate': buyRate,
+      'physical_rate': physicalRate,
+      'ecode_rate': ecodeRate,
+      'min_value': minValue,
+      'max_value': maxValue,
+      'allowed_denominations': allowedDenominations,
     };
 
     if (isEdit) {
-      await client.from('gift_cards').update(data).eq('id', id);
+      final response =
+          await client.from('gift_cards').update(data).eq('id', id).select();
+
+      if (response.isEmpty) {
+        throw 'Update failed: No rows modified. Check permissions.';
+      }
     } else {
       await client.from('gift_cards').insert(data);
     }
+  }
+
+  /// Parse comma-separated denominations string into list of doubles
+  List<double> _parseDenominations(String text) {
+    if (text.trim().isEmpty) return [];
+    return text
+        .split(',')
+        .map((s) => double.tryParse(s.trim()) ?? 0)
+        .where((d) => d > 0)
+        .toList();
   }
 
   Future<void> _confirmDelete(BuildContext context, GiftCard card) async {
@@ -495,6 +626,7 @@ class _AdminGiftCardsManagementScreenState
         final client = ref.read(supabaseClientProvider);
         await client.from('gift_cards').delete().eq('id', card.id);
         _clearImageCaches();
+        ref.invalidate(adminGiftCardsFromDbProvider);
         ref.invalidate(giftCardsFromDbProvider);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -511,5 +643,672 @@ class _AdminGiftCardsManagementScreenState
         }
       }
     }
+  }
+
+  /// Show variants management dialog for Apple cards
+  Future<void> _showVariantsDialog(BuildContext context) async {
+    // Show full screen dialog/modal sheet
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _VariantsManager(ref: ref),
+    );
+  }
+}
+
+/// Admin Widget to manage variants and rates
+/// Separated for cleaner state management
+class _VariantsManager extends StatefulWidget {
+  final WidgetRef ref;
+  const _VariantsManager({required this.ref});
+
+  @override
+  State<_VariantsManager> createState() => _VariantsManagerState();
+}
+
+class _VariantsManagerState extends State<_VariantsManager> {
+  bool _isLoading = true;
+  List<GiftCardVariant> _variants = [];
+  GiftCardVariant? _selectedVariant;
+
+  // Local state for denomination rates (denomination -> rate as string)
+  // This allows dynamic add/remove without touching DB until save
+  final Map<double, TextEditingController> _rateControllers = {};
+  final Set<double> _deletedDenominations = {}; // Track deletions
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVariants();
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
+
+  void _disposeControllers() {
+    for (var controller in _rateControllers.values) {
+      controller.dispose();
+    }
+    _rateControllers.clear();
+    _deletedDenominations.clear();
+  }
+
+  Future<void> _loadVariants() async {
+    setState(() => _isLoading = true);
+    await clearAppleVariantsCache(widget.ref);
+    final variants = await widget.ref.read(adminAppleVariantsProvider.future);
+
+    if (mounted) {
+      setState(() {
+        _variants = variants;
+        if (variants.isNotEmpty && _selectedVariant == null) {
+          _selectVariant(variants.first);
+        } else if (_selectedVariant != null) {
+          // Re-select to refresh data
+          final updated = variants.firstWhere(
+            (v) => v.id == _selectedVariant!.id,
+            orElse: () => variants.first,
+          );
+          _selectVariant(updated);
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _selectVariant(GiftCardVariant variant) {
+    _disposeControllers();
+    // Initialize controllers from existing rates
+    for (var rate in variant.denominationRates) {
+      _rateControllers[rate.denomination] = TextEditingController(
+        text: rate.rate > 0 ? rate.rate.toStringAsFixed(0) : '',
+      );
+    }
+    setState(() => _selectedVariant = variant);
+  }
+
+  /// Adds a denomination to the local state (not DB yet)
+  void _addDenomination(double denomination, double rate) {
+    _rateControllers[denomination] = TextEditingController(
+      text: rate > 0 ? rate.toStringAsFixed(0) : '',
+    );
+    _deletedDenominations.remove(denomination);
+  }
+
+  void _removeDenomination(double denomination) {
+    final controller = _rateControllers[denomination];
+    _rateControllers.remove(denomination);
+    _deletedDenominations.add(denomination);
+    controller?.dispose();
+    setState(() {});
+  }
+
+  Future<void> _showAddDenominationDialog() async {
+    final denomController = TextEditingController();
+    final rateController = TextEditingController();
+    String? errorMessage;
+
+    final result = await showDialog<Map<String, double>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.backgroundCard,
+          title: const Text('Add Denomination',
+              style: TextStyle(color: Colors.white)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: denomController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.white),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Denomination (\$)',
+                    labelStyle: TextStyle(color: AppColors.textSecondary),
+                    hintText: 'e.g., 25',
+                    hintStyle: TextStyle(color: AppColors.textTertiary),
+                    filled: true,
+                    fillColor: AppColors.backgroundElevated,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: rateController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Rate (₦)',
+                    labelStyle: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Roboto',
+                      fontFamilyFallback: const ['Noto Sans'],
+                    ),
+                    hintText: 'e.g., 1450',
+                    hintStyle: TextStyle(color: AppColors.textTertiary),
+                    filled: true,
+                    fillColor: AppColors.backgroundElevated,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final denomText = denomController.text.trim();
+                final rateText = rateController.text.trim();
+                final denom = double.tryParse(denomText);
+                final rate = double.tryParse(rateText) ?? 0;
+
+                if (denom == null || denom <= 0) {
+                  setDialogState(
+                      () => errorMessage = 'Enter a valid denomination');
+                  return;
+                }
+
+                // Check for duplicate
+                if (_rateControllers.containsKey(denom)) {
+                  setDialogState(
+                      () => errorMessage = '\$${denom.toInt()} already exists');
+                  denomController.clear();
+                  return;
+                }
+
+                Navigator.pop(ctx, {'denom': denom, 'rate': rate});
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+              ),
+              child: const Text('Add', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // Dispose controllers after frame completes to avoid "disposed while in use" error
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      denomController.dispose();
+      rateController.dispose();
+    });
+
+    // Update state AFTER dialog is closed
+    if (result != null && mounted) {
+      setState(() {
+        _addDenomination(result['denom']!, result['rate']!);
+      });
+    }
+  }
+
+  Future<void> _saveRates() async {
+    if (_selectedVariant == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final client = widget.ref.read(supabaseClientProvider);
+      final variantId = _selectedVariant!.id;
+
+      // Batch delete removed denominations
+      if (_deletedDenominations.isNotEmpty) {
+        await client
+            .from('gift_card_denomination_rates')
+            .delete()
+            .eq('variant_id', variantId)
+            .inFilter('denomination', _deletedDenominations.toList());
+      }
+
+      // Batch upsert all current denominations
+      if (_rateControllers.isNotEmpty) {
+        final upsertData = _rateControllers.entries.map((entry) {
+          return {
+            'variant_id': variantId,
+            'denomination': entry.key,
+            'rate': double.tryParse(entry.value.text.trim()) ?? 0.0,
+            'is_active': true,
+          };
+        }).toList();
+
+        await client
+            .from('gift_card_denomination_rates')
+            .upsert(upsertData, onConflict: 'variant_id, denomination');
+      }
+
+      _deletedDenominations.clear();
+      await clearAppleVariantsCache(widget.ref);
+      await _loadVariants();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rates saved!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleVariantStatus(bool isActive) async {
+    if (_selectedVariant == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final client = widget.ref.read(supabaseClientProvider);
+      await client
+          .from('gift_card_variants')
+          .update({'is_active': isActive}).eq('id', _selectedVariant!.id);
+
+      await clearAppleVariantsCache(widget.ref);
+      await _loadVariants();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Variant ${isActive ? "enabled" : "disabled"}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Sort denominations for consistent display
+    final sortedDenoms = _rateControllers.keys.toList()..sort();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: AppColors.backgroundDark,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.white10)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Manage Apple Variants',
+                    style: AppTextStyles.titleMedium(context)),
+                IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          if (_isLoading && _variants.isEmpty)
+            const Expanded(child: Center(child: RocketLoader()))
+          else
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sidebar: Variant List
+                  Container(
+                    width: 100,
+                    decoration: const BoxDecoration(
+                      border: Border(right: BorderSide(color: Colors.white10)),
+                    ),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      itemCount: _variants.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final variant = _variants[index];
+                        final isSelected = _selectedVariant?.id == variant.id;
+                        return InkWell(
+                          onTap: () => _selectVariant(variant),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primaryOrange.withOpacity(0.1)
+                                  : null,
+                              border: Border(
+                                left: BorderSide(
+                                  color: isSelected
+                                      ? AppColors.primaryOrange
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  variant.name.replaceFirst('AppleCard ', ''),
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? AppColors.primaryOrange
+                                        : AppColors.textSecondary,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (!variant.isActive)
+                                  const Text(
+                                    'OFF',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Main Content: Rates Editor
+                  Expanded(
+                    child: _selectedVariant == null
+                        ? const Center(
+                            child: Text('Select a variant',
+                                style:
+                                    TextStyle(color: AppColors.textSecondary)))
+                        : Stack(
+                            children: [
+                              Column(
+                                children: [
+                                  // Header with controls
+                                  Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _selectedVariant!.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Active',
+                                                  style: TextStyle(
+                                                    color: _selectedVariant!
+                                                            .isActive
+                                                        ? Colors.green
+                                                        : AppColors
+                                                            .textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                Switch(
+                                                  value: _selectedVariant!
+                                                      .isActive,
+                                                  onChanged:
+                                                      _toggleVariantStatus,
+                                                  activeColor:
+                                                      AppColors.primaryOrange,
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                ),
+                                              ],
+                                            ),
+                                            ElevatedButton.icon(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : _saveRates,
+                                              icon: const Icon(Icons.save,
+                                                  size: 16),
+                                              label: const Text('Save'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.primaryOrange,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 8),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Denomination List
+                                  Expanded(
+                                    child: sortedDenoms.isEmpty
+                                        ? Center(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.add_circle_outline,
+                                                    size: 48,
+                                                    color: AppColors
+                                                        .textSecondary),
+                                                const SizedBox(height: 12),
+                                                const Text(
+                                                  'No denominations yet',
+                                                  style: TextStyle(
+                                                      color: AppColors
+                                                          .textSecondary),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                const Text(
+                                                  'Tap + to add one',
+                                                  style: TextStyle(
+                                                    color:
+                                                        AppColors.textTertiary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        : ListView.separated(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12),
+                                            itemCount: sortedDenoms.length,
+                                            separatorBuilder: (_, __) =>
+                                                const SizedBox(height: 8),
+                                            itemBuilder: (context, index) {
+                                              final denom = sortedDenoms[index];
+                                              final controller =
+                                                  _rateControllers[denom]!;
+                                              return Container(
+                                                key: ValueKey(denom.toInt()),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      AppColors.backgroundCard,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    SizedBox(
+                                                      width: 60,
+                                                      child: Text(
+                                                        '\$${denom.toInt()}',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      child: TextField(
+                                                        controller: controller,
+                                                        keyboardType:
+                                                            TextInputType
+                                                                .number,
+                                                        style: const TextStyle(
+                                                            color:
+                                                                Colors.white),
+                                                        decoration:
+                                                            InputDecoration(
+                                                          hintText: '0',
+                                                          hintStyle:
+                                                              const TextStyle(
+                                                                  color: Colors
+                                                                      .white24),
+                                                          prefixText: '₦ ',
+                                                          prefixStyle:
+                                                              TextStyle(
+                                                            color: AppColors
+                                                                .textSecondary,
+                                                            fontFamily:
+                                                                'Roboto',
+                                                            fontFamilyFallback: const [
+                                                              'Noto Sans'
+                                                            ],
+                                                          ),
+                                                          isDense: true,
+                                                          filled: true,
+                                                          fillColor: AppColors
+                                                              .backgroundElevated,
+                                                          border:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        6),
+                                                            borderSide:
+                                                                BorderSide.none,
+                                                          ),
+                                                          contentPadding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      10,
+                                                                  vertical: 8),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                          Icons.delete_outline,
+                                                          color: Colors.red,
+                                                          size: 20),
+                                                      onPressed: () =>
+                                                          _removeDenomination(
+                                                              denom),
+                                                      padding: EdgeInsets.zero,
+                                                      constraints:
+                                                          const BoxConstraints(
+                                                              minWidth: 32,
+                                                              minHeight: 32),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                ],
+                              ),
+
+                              // FAB for adding new denomination
+                              Positioned(
+                                right: 16,
+                                bottom: 16,
+                                child: FloatingActionButton(
+                                  mini: true,
+                                  backgroundColor: AppColors.primaryOrange,
+                                  onPressed: _showAddDenominationDialog,
+                                  child: const Icon(Icons.add,
+                                      color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

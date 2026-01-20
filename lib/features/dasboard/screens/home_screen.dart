@@ -8,6 +8,7 @@ import '../../transactions/screens/buy_sell_crypto_screen.dart';
 import '../../giftcards/screens/gift_cards_screen.dart';
 import 'settings_screen.dart';
 import '../../../core/providers/navigation_provider.dart';
+import '../../chat/providers/chat_provider.dart';
 
 /// Home Screen (Shell)
 /// Main shell that holds the Bottom Navigation Bar and persistent tabs
@@ -27,20 +28,22 @@ class HomeScreen extends ConsumerWidget {
       const SettingsScreen(), // Index 4: More
     ];
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
-        child: IndexedStack(
-          index: currentNavIndex,
-          children: screens,
+    return ChatNotificationListener(
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        body: SafeArea(
+          child: IndexedStack(
+            index: currentNavIndex,
+            children: screens,
+          ),
         ),
-      ),
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: currentNavIndex,
-        onTap: (index) {
-          // Just update provider, IndexedStack handles the rest
-          ref.read(navigationProvider.notifier).setIndex(index);
-        },
+        bottomNavigationBar: AppBottomNavBar(
+          currentIndex: currentNavIndex,
+          onTap: (index) {
+            // Just update provider, IndexedStack handles the rest
+            ref.read(navigationProvider.notifier).setIndex(index);
+          },
+        ),
       ),
     );
   }

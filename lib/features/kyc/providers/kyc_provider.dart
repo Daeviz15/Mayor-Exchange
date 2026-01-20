@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart'; // Required for StateNotifier in v3
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../models/kyc_request.dart';

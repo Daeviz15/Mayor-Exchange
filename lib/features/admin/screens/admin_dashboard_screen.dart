@@ -4,18 +4,21 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/currency_text.dart';
 import '../../transactions/models/transaction.dart';
-import '../../transactions/repositories/transaction_repository.dart';
 import 'admin_transaction_detail_screen.dart';
 import 'admin_rates_screen.dart';
+import '../../transactions/providers/transaction_service.dart';
+import '../../chat/providers/chat_provider.dart';
 
 import 'admin_giftcards_management_screen.dart';
 import 'admin_wallet_settings_screen.dart';
 import 'admin_kyc_list_screen.dart';
 import 'admin_list_screen.dart';
+import 'admin_performance_screen.dart';
 
 import '../../../core/widgets/rocket_loader.dart';
 
 import '../providers/admin_notification_provider.dart';
+import '../providers/admin_history_provider.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -120,6 +123,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                   builder: (_) => const AdminWalletSettingsScreen()),
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.analytics, color: AppColors.primaryOrange),
+            tooltip: 'Performance Stats',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminPerformanceScreen()),
+            ),
+          ),
           const SizedBox(width: 8),
         ],
         bottom: TabBar(
@@ -145,7 +156,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
               TransactionStatus.verificationPending
             ],
           ),
-          _TransactionList(filterStatuses: null), // Full history
+          const _PaginatedTransactionList(), // Full history (Paginated)
         ],
       ),
     );
@@ -159,42 +170,23 @@ class _TransactionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Fetch ALL transactions to ensure we have the full history and can filter locally.
-    // This solves the issue of implicit Supabase stream limitations and provides flexibility.
-    final transactionsStream =
-        ref.watch(transactionRepositoryProvider).watchAllTransactions();
+    // Determine which statuses to watch. If filterStatuses is null, watch all.
+    final adminTransactionsAsync = filterStatuses == null
+        ? ref.watch(adminTransactionsProvider)
+        : ref.watch(adminTransactionsByStatusProvider(filterStatuses!));
 
-    return StreamBuilder<List<TransactionModel>>(
-      stream: transactionsStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: RocketLoader());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.red)));
-        }
-
-        final allTransactions = snapshot.data ?? [];
-
-        // Filter locally
-        final transactions = filterStatuses == null
-            ? allTransactions // Show all if filter is null (History Tab)
-            : allTransactions
-                .where((t) => filterStatuses!.contains(t.status))
-                .toList();
-
+    return adminTransactionsAsync.when(
+      loading: () => const Center(child: RocketLoader()),
+      error: (error, stack) => Center(
+        child: Text('Error: $error', style: const TextStyle(color: Colors.red)),
+      ),
+      data: (transactions) {
         return RefreshIndicator(
           color: AppColors.primaryOrange,
           backgroundColor: AppColors.backgroundCard,
           onRefresh: () async {
-            // Trigger a refresh of the stream provider
-            await ref
-                .refresh(transactionRepositoryProvider)
-                .watchAllTransactions()
-                .first;
+            // Invalidate the provider to trigger a fresh fetch
+            ref.invalidate(adminTransactionsProvider);
           },
           child: transactions.isEmpty
               ? ListView(
@@ -228,13 +220,15 @@ class _TransactionList extends ConsumerWidget {
   }
 }
 
-class _TransactionCard extends StatelessWidget {
+class _TransactionCard extends ConsumerWidget {
   final TransactionModel transaction;
 
   const _TransactionCard({required this.transaction});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadAsync = ref.watch(unreadCountStreamProvider(transaction.id));
+
     return Card(
       color: AppColors.backgroundCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -273,8 +267,36 @@ class _TransactionCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios,
-            size: 16, color: AppColors.textSecondary),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            unreadAsync.when(
+              data: (count) => count > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios,
+                size: 16, color: AppColors.textSecondary),
+          ],
+        ),
         onTap: () {
           Navigator.push(
             context,
@@ -285,6 +307,99 @@ class _TransactionCard extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _PaginatedTransactionList extends ConsumerStatefulWidget {
+  const _PaginatedTransactionList();
+
+  @override
+  ConsumerState<_PaginatedTransactionList> createState() =>
+      _PaginatedTransactionListState();
+}
+
+class _PaginatedTransactionListState
+    extends ConsumerState<_PaginatedTransactionList> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(adminHistoryProvider.notifier).loadNextPage();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stateAsync = ref.watch(adminHistoryProvider);
+
+    return stateAsync.when(
+      loading: () => const Center(child: RocketLoader()),
+      error: (error, stack) => Center(
+          child:
+              Text('Error: $error', style: const TextStyle(color: Colors.red))),
+      data: (state) {
+        final transactions = state.transactions;
+        return RefreshIndicator(
+          color: AppColors.primaryOrange,
+          backgroundColor: AppColors.backgroundCard,
+          onRefresh: () async {
+            await ref.read(adminHistoryProvider.notifier).refresh();
+          },
+          child: transactions.isEmpty && !state.hasMore
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                    Center(
+                      child: Text(
+                        'No transaction history',
+                        style: AppTextStyles.bodyMedium(context)
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.separated(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: transactions.length + (state.hasMore ? 1 : 0),
+                  padding: const EdgeInsets.all(16),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    if (index == transactions.length) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primaryOrange,
+                              )),
+                        ),
+                      );
+                    }
+                    final transaction = transactions[index];
+                    return _TransactionCard(transaction: transaction);
+                  },
+                ),
+        );
+      },
     );
   }
 }

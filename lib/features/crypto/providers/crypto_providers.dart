@@ -42,7 +42,7 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
             .toList();
       }
     } catch (e) {
-      // Debug removed
+      // Silently fail cache read
     }
     return [];
   }
@@ -57,7 +57,6 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
     }
 
     try {
-      // Debug removed
       final marketData = await CoinGeckoService.getMarketData();
 
       final List<CryptoData> cryptoList = [];
@@ -94,13 +93,11 @@ class CryptoListNotifier extends AsyncNotifier<List<CryptoData>> {
       // Update State
       state = AsyncData(cryptoList);
     } catch (e, stack) {
-      // Debug removed
-      // If we have cached data, we keep it but maybe show a snackbar (UI responsibility)
-      // or we set state to Error only if we have no data?
+      // If we have cached data, we keep it
+      // If we have no data, set error state
       if (state.asData?.value.isEmpty ?? true) {
         state = AsyncError(e, stack);
       }
-      // If we have data, we silently fail the refresh (or could use a side-channel for errors)
     }
   }
 
@@ -136,7 +133,8 @@ List<double> _generateChartData(double currentPrice, double changePercent24h) {
 
 /// Crypto Details Provider
 /// Provides detailed real-time crypto information by symbol
-final cryptoDetailsProvider = FutureProvider.family<CryptoDetails, String>((
+final cryptoDetailsProvider =
+    FutureProvider.autoDispose.family<CryptoDetails, String>((
   ref,
   symbol,
 ) async {
@@ -177,7 +175,6 @@ final cryptoDetailsProvider = FutureProvider.family<CryptoDetails, String>((
       priceHistory: priceHistory,
     );
   } catch (e) {
-    // Return a default/error state or rethrow
     rethrow;
   }
 });
@@ -185,7 +182,7 @@ final cryptoDetailsProvider = FutureProvider.family<CryptoDetails, String>((
 /// Historical Chart Data Provider
 /// Provides chart data for a specific symbol and time range
 final chartDataProvider =
-    FutureProvider.family<List<PricePoint>, ChartDataParams>((
+    FutureProvider.autoDispose.family<List<PricePoint>, ChartDataParams>((
   ref,
   params,
 ) async {
@@ -259,46 +256,12 @@ String _getIconLetter(String symbol) {
   return symbol.substring(0, 1).toUpperCase();
 }
 
-/// Selected Time Range Provider
+/// Selected Time Range Provider - Modern StateProvider
 final selectedTimeRangeProvider =
-    StateNotifierProvider<TimeRangeNotifier, TimeRange>((ref) {
-  return TimeRangeNotifier();
-});
+    StateProvider<TimeRange>((ref) => TimeRange.twentyFourHours);
 
-class TimeRangeNotifier extends StateNotifier<TimeRange> {
-  TimeRangeNotifier() : super(TimeRange.twentyFourHours);
+/// Order Type Provider - Modern StateProvider
+final orderTypeProvider = StateProvider<OrderType>((ref) => OrderType.market);
 
-  void setRange(TimeRange range) {
-    state = range;
-  }
-}
-
-/// Order Type Provider
-final orderTypeProvider = StateNotifierProvider<OrderTypeNotifier, OrderType>((
-  ref,
-) {
-  return OrderTypeNotifier();
-});
-
-class OrderTypeNotifier extends StateNotifier<OrderType> {
-  OrderTypeNotifier() : super(OrderType.market);
-
-  void setType(OrderType type) {
-    state = type;
-  }
-}
-
-/// Buy/Sell Mode Provider
-final buySellModeProvider = StateNotifierProvider<BuySellModeNotifier, bool>((
-  ref,
-) {
-  return BuySellModeNotifier();
-});
-
-class BuySellModeNotifier extends StateNotifier<bool> {
-  BuySellModeNotifier() : super(true); // true = Buy
-
-  void setMode(bool isBuy) {
-    state = isBuy;
-  }
-}
+/// Buy/Sell Mode Provider - Modern StateProvider (true = Buy)
+final buySellModeProvider = StateProvider<bool>((ref) => true);

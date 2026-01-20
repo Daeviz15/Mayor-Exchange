@@ -1,13 +1,19 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/providers/supabase_provider.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/widgets/error_state_widget.dart';
+import '../../chat/screens/transaction_chat_screen.dart';
+import '../../chat/providers/chat_provider.dart';
+import '../../../core/widgets/currency_text.dart';
 
 class AdminTransactionDetailScreen extends ConsumerStatefulWidget {
   final TransactionModel transaction;
@@ -127,6 +133,10 @@ class _AdminTransactionDetailScreenState
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          _buildAdminChatButton(widget.transaction),
+          const SizedBox(width: 8),
+        ],
       ),
       body: transactionAsync.when(
         loading: () => _buildContent(widget.transaction, isLoading: true),
@@ -139,6 +149,59 @@ class _AdminTransactionDetailScreenState
           return _buildContent(transaction);
         },
       ),
+    );
+  }
+
+  /// Admin chat button with unread badge
+  Widget _buildAdminChatButton(TransactionModel transaction) {
+    final unreadAsync = ref.watch(unreadCountStreamProvider(transaction.id));
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chat, color: AppColors.primaryOrange),
+          tooltip: 'Open Chat',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TransactionChatScreen(
+                transactionId: transaction.id,
+                transactionTitle: 'Chat: ${transaction.type.name}',
+                transactionDetails: transaction.details,
+              ),
+            ),
+          ),
+        ),
+        // Unread badge
+        unreadAsync.when(
+          data: (count) => count > 0
+              ? Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      count > 9 ? '9+' : '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 
@@ -165,13 +228,20 @@ class _AdminTransactionDetailScreenState
               ),
             ),
           ),
+          const SizedBox(height: 10),
+
+          // Lock Status Indicator
+          _buildLockStatusIndicator(transaction),
+
           const SizedBox(height: 20),
 
           // Key Details
           _buildDetailRow('Transaction ID', transaction.id.substring(0, 8)),
           _buildDetailRow('Type', transaction.type.name.toUpperCase()),
-          _buildDetailRow('Amount (Fiat)',
-              '${transaction.details['currency_symbol'] ?? '₦'}${transaction.amountFiat.toStringAsFixed(2)}'),
+          _buildCurrencyRow(
+              'Amount (Fiat)',
+              transaction.details['currency_symbol'] ?? '\u20A6',
+              transaction.amountFiat.toStringAsFixed(2)),
           if (transaction.details.containsKey('usd_input'))
             _buildDetailRow(
                 'USD Input', '\$${transaction.details['usd_input']}'),
@@ -196,8 +266,8 @@ class _AdminTransactionDetailScreenState
                 '${transaction.amountCrypto} ${transaction.currencyPair.split('/').first}'),
           _buildDetailRow('Currency Pair', transaction.currencyPair),
           if (transaction.details.containsKey('fx_rate_applied'))
-            _buildDetailRow(
-                'FX Rate', '₦${transaction.details['fx_rate_applied']}/USD'),
+            _buildCurrencyRow('FX Rate', '\u20A6',
+                '${transaction.details['fx_rate_applied']}/USD'),
           _buildDetailRow('User ID', transaction.userId),
           _buildDetailRow('Created At', transaction.createdAt.toString()),
 
@@ -253,6 +323,11 @@ class _AdminTransactionDetailScreenState
             ),
           ],
 
+          const SizedBox(height: 20),
+
+          // Admin Proof Images Section
+          _buildAdminProofImagesSection(transaction),
+
           const SizedBox(height: 40),
 
           // Actions Area
@@ -287,6 +362,373 @@ class _AdminTransactionDetailScreenState
         ],
       ),
     );
+  }
+
+  /// Build row with currency symbol using CurrencyText widget for proper rendering
+  Widget _buildCurrencyRow(String label, String symbol, String amount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label,
+                style: const TextStyle(color: AppColors.textSecondary)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: CurrencyText(
+                symbol: symbol,
+                amount: amount,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build lock status indicator with claim/unclaim actions
+  Widget _buildLockStatusIndicator(TransactionModel transaction) {
+    final currentUserId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+    if (currentUserId == null) return const SizedBox.shrink();
+
+    final isClaimedByMe =
+        transaction.adminId == currentUserId && transaction.claimedAt != null;
+    final isClaimedByOther = transaction.isClaimedByOther(currentUserId);
+
+    if (!transaction.status.isActive) {
+      return const SizedBox
+          .shrink(); // No lock status for completed transactions
+    }
+
+    if (isClaimedByOther) {
+      // Claimed by another admin - show warning
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.withAlpha(30),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock, color: Colors.red, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Locked by another admin. You cannot modify this transaction.',
+                style: TextStyle(color: Colors.red[300], fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isClaimedByMe) {
+      // Claimed by current admin - show unclaim option
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.withAlpha(30),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.green),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_open, color: Colors.green, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'You have claimed this order',
+                style: TextStyle(color: Colors.green[300], fontSize: 12),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _unclaimTransaction(transaction),
+              child:
+                  const Text('Release', style: TextStyle(color: Colors.orange)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Not claimed - show claim button
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primaryOrange.withAlpha(30),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primaryOrange),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline,
+              color: AppColors.primaryOrange, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Claim this order to start processing',
+              style: TextStyle(color: Colors.orange[300], fontSize: 12),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => _claimTransaction(transaction),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryOrange,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: const Text('Claim', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Claim a transaction for this admin
+  Future<void> _claimTransaction(TransactionModel transaction) async {
+    setState(() => _isLoading = true);
+    try {
+      final client = ref.read(supabaseClientProvider);
+      final adminId = client.auth.currentUser!.id;
+
+      await client.from('transactions').update({
+        'admin_id': adminId,
+        'claimed_at': DateTime.now().toIso8601String(),
+        'status': 'claimed',
+      }).eq('id', transaction.id);
+
+      // Log the activity
+      await client.from('admin_activity_log').insert({
+        'admin_id': adminId,
+        'transaction_id': transaction.id,
+        'action': 'claim',
+      });
+
+      // Send notification to user
+      await client.from('notifications').insert({
+        'user_id': transaction.userId,
+        'title': 'Transaction Update',
+        'message':
+            'Your transaction has been claimed by an admin and is being processed.',
+        'type': 'transaction',
+        'related_id': transaction.id,
+        'is_read': false,
+      });
+
+      ref.invalidate(singleTransactionProvider(transaction.id));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Order claimed!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Release/unclaim a transaction
+  Future<void> _unclaimTransaction(TransactionModel transaction) async {
+    setState(() => _isLoading = true);
+    try {
+      final client = ref.read(supabaseClientProvider);
+      final adminId = client.auth.currentUser!.id;
+
+      await client.from('transactions').update({
+        'admin_id': null,
+        'claimed_at': null,
+        'status': 'pending',
+      }).eq('id', transaction.id);
+
+      // Log the activity
+      await client.from('admin_activity_log').insert({
+        'admin_id': adminId,
+        'transaction_id': transaction.id,
+        'action': 'unclaim',
+      });
+
+      ref.invalidate(singleTransactionProvider(transaction.id));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Order released'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Section for displaying and uploading admin proof images
+  Widget _buildAdminProofImagesSection(TransactionModel transaction) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Admin Proof Images',
+                style: AppTextStyles.titleMedium(context)),
+            // Upload button (only for active transactions)
+            if (transaction.status.isActive)
+              IconButton(
+                onPressed: () => _uploadAdminProof(transaction),
+                icon: const Icon(Icons.add_photo_alternate,
+                    color: AppColors.primaryOrange),
+                tooltip: 'Add Proof Image',
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (transaction.adminProofImages.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Center(
+              child: Text(
+                'No admin proof images yet',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: transaction.adminProofImages.length,
+              itemBuilder: (context, index) {
+                final imageUrl = transaction.adminProofImages[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: GestureDetector(
+                    onTap: () => _showFullImage(imageUrl),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          width: 120,
+                          height: 120,
+                          color: AppColors.backgroundCard,
+                          child:
+                              const Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          width: 120,
+                          height: 120,
+                          color: AppColors.backgroundCard,
+                          child: const Icon(Icons.error, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Show full image in dialog
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Upload admin proof image
+  Future<void> _uploadAdminProof(TransactionModel transaction) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final client = ref.read(supabaseClientProvider);
+      final file = File(picked.path);
+      final fileExt = picked.path.split('.').last;
+      final fileName =
+          'admin_${transaction.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      // Upload to storage
+      await client.storage
+          .from('transaction-proofs')
+          .upload('admin/$fileName', file);
+
+      // Get signed URL (works for private buckets - valid for 1 year)
+      final imageUrl = await client.storage
+          .from('transaction-proofs')
+          .createSignedUrl('admin/$fileName', 60 * 60 * 24 * 365);
+
+      // Update transaction with new image
+      final updatedImages = [...transaction.adminProofImages, imageUrl];
+      await client.from('transactions').update({
+        'admin_proof_images': updatedImages,
+      }).eq('id', transaction.id);
+
+      // Refresh data
+      ref.invalidate(singleTransactionProvider(transaction.id));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Proof image uploaded!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _approveTransaction(
@@ -764,7 +1206,11 @@ class _PayoutDialogState extends State<_PayoutDialog> {
             style: const TextStyle(color: Colors.white, fontSize: 18),
             decoration: InputDecoration(
               prefixText: '₦ ',
-              prefixStyle: const TextStyle(color: AppColors.primaryOrange),
+              prefixStyle: const TextStyle(
+                color: AppColors.primaryOrange,
+                fontFamily: 'Roboto',
+                fontFamilyFallback: ['Noto Sans'],
+              ),
               filled: true,
               fillColor: AppColors.backgroundDark,
               border: OutlineInputBorder(

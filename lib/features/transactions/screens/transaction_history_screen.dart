@@ -9,13 +9,42 @@ import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/widgets/error_state_widget.dart';
 
 import 'buyer_transaction_status_screen.dart'; // Added import
+import '../../chat/providers/chat_provider.dart';
 
-class TransactionHistoryScreen extends ConsumerWidget {
+class TransactionHistoryScreen extends ConsumerStatefulWidget {
   const TransactionHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(userTransactionsProvider);
+  ConsumerState<TransactionHistoryScreen> createState() =>
+      _TransactionHistoryScreenState();
+}
+
+class _TransactionHistoryScreenState
+    extends ConsumerState<TransactionHistoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(userHistoryProvider.notifier).loadNextPage();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stateAsync = ref.watch(userHistoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -23,94 +52,106 @@ class TransactionHistoryScreen extends ConsumerWidget {
         backgroundColor: AppColors.backgroundCard,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          tooltip:
-              null, // Disable tooltip to prevent RenderBox layout error during transition
+          tooltip: null,
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('History', style: AppTextStyles.titleLarge(context)),
       ),
-      body: RefreshIndicator(
-        color: AppColors.primaryOrange,
-        backgroundColor: AppColors.backgroundCard,
-        onRefresh: () async {
-          // Refresh the provider to restart the stream/fetch
-          return ref.refresh(userTransactionsProvider.future);
-        },
-        child: transactionsAsync.when(
-          loading: () => const Center(child: RocketLoader()),
-          error: (err, stack) => ErrorStateWidget(
-            error: err,
-            onRetry: () => ref.refresh(userTransactionsProvider.future),
-          ),
-          data: (transactions) {
-            if (transactions.isEmpty) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height *
-                          0.35), // Center vertically
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.history,
-                            size: 64, color: AppColors.textSecondary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No transactions yet.',
-                          style: AppTextStyles.bodyMedium(context)
-                              .copyWith(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: transactions.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final transaction = transactions[index];
-                return GestureDetector(
-                  onTap: () {
-                    // Navigate to detail screen for Buy transactions
-                    // This allows viewing status (Pending/Payment) AND completed details (Gift Card Code)
-                    if (transaction.type == TransactionType.buyGiftCard ||
-                        transaction.type == TransactionType.buyCrypto) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BuyerTransactionStatusScreen(
-                            transactionId: transaction.id,
-                            initialTransaction: transaction,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: _HistoryCard(transaction: transaction),
-                );
-              },
-            );
-          },
+      body: stateAsync.when(
+        loading: () => const Center(child: RocketLoader()),
+        error: (err, stack) => ErrorStateWidget(
+          error: err,
+          onRetry: () => ref.read(userHistoryProvider.notifier).refresh(),
         ),
+        data: (state) {
+          final transactions = state.transactions;
+
+          return RefreshIndicator(
+            color: AppColors.primaryOrange,
+            backgroundColor: AppColors.backgroundCard,
+            onRefresh: () async {
+              await ref.read(userHistoryProvider.notifier).refresh();
+            },
+            child: transactions.isEmpty && !state.hasMore
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.35),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.history,
+                                size: 64, color: AppColors.textSecondary),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No transactions yet.',
+                              style: AppTextStyles.bodyMedium(context)
+                                  .copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: transactions.length + (state.hasMore ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      if (index == transactions.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primaryOrange,
+                                )),
+                          ),
+                        );
+                      }
+                      final transaction = transactions[index];
+                      return GestureDetector(
+                        onTap: () {
+                          if (transaction.type == TransactionType.buyGiftCard ||
+                              transaction.type == TransactionType.buyCrypto) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    BuyerTransactionStatusScreen(
+                                  transactionId: transaction.id,
+                                  initialTransaction: transaction,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: _HistoryCard(transaction: transaction),
+                      );
+                    },
+                  ),
+          );
+        },
       ),
     );
   }
 }
 
-class _HistoryCard extends StatelessWidget {
+class _HistoryCard extends ConsumerWidget {
   final TransactionModel transaction;
 
   const _HistoryCard({required this.transaction});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadAsync = ref.watch(unreadCountStreamProvider(transaction.id));
     final isBuy = transaction.type == TransactionType.buyCrypto ||
         transaction.type == TransactionType.buyGiftCard ||
         transaction.type == TransactionType.deposit;
@@ -157,6 +198,31 @@ class _HistoryCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+
+            // Unread Badge
+            unreadAsync.when(
+              data: (count) => count > 0
+                  ? Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
 
             // Amount & Status

@@ -35,14 +35,20 @@ class TransactionRepository {
   }
 
   /// Watch transactions for the current user
-  Stream<List<TransactionModel>> watchUserTransactions(String userId) {
-    return _client
+  Stream<List<TransactionModel>> watchUserTransactions(String userId,
+      {int? limit}) {
+    var query = _client
         .from('transactions')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .map((data) =>
-            data.map((json) => TransactionModel.fromJson(json)).toList());
+        .order('created_at', ascending: false);
+
+    if (limit != null) {
+      query = query.limit(limit);
+    }
+
+    return query.map(
+        (data) => data.map((json) => TransactionModel.fromJson(json)).toList());
   }
 
   /// Watch a SINGLE transaction by ID
@@ -58,16 +64,68 @@ class TransactionRepository {
   }
 
   /// Watch ALL transactions (for Admin)
-  Stream<List<TransactionModel>> watchAllTransactions() {
-    return _client
+  /// Uses a hybrid approach: fetch first, then subscribe to stream.
+  /// LIMITED to recent 50 to prevent crash on large datasets.
+  Stream<List<TransactionModel>> watchAllTransactions() async* {
+    // 1. Immediately fetch current data (fast, reliable)
+    try {
+      final initialData = await _client
+          .from('transactions')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(50); // Optimization: Limit to 50
+      yield (initialData as List)
+          .map((json) => TransactionModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      // If initial fetch fails, yield empty and continue to stream
+      yield <TransactionModel>[];
+    }
+
+    // 2. Then subscribe to realtime stream for updates
+    // Note: Stream limits are tricky. We rely on the initial fetch for the bulk.
+    // Realtime events will push new items.
+    yield* _client
         .from('transactions')
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
+        .limit(50) // Optimization: Limit to 50
         .map((data) =>
             data.map((json) => TransactionModel.fromJson(json)).toList());
   }
 
+  /// Fetch paginated transactions (for History tab infinite scroll)
+  Future<List<TransactionModel>> getTransactionsPaginated({
+    required int page,
+    required int pageSize,
+    TransactionStatus? status,
+    String? userId, // Optional: Filter by user ID
+  }) async {
+    final from = page * pageSize;
+    final to = from + pageSize - 1;
+
+    // Start building query
+    PostgrestFilterBuilder query = _client.from('transactions').select();
+
+    // Apply filters
+    if (status != null) {
+      query = query.eq('status', status.value);
+    }
+    if (userId != null) {
+      query = query.eq('user_id', userId);
+    }
+
+    // Apply sorting and pagination
+    final response =
+        await query.order('created_at', ascending: false).range(from, to);
+
+    return (response as List)
+        .map((json) => TransactionModel.fromJson(json))
+        .toList();
+  }
+
   /// Watch transactions by status (for Admin Tabs)
+  /// LIMITED to recent 50
   Stream<List<TransactionModel>> watchTransactionsByStatus(
       TransactionStatus status) {
     return _client
@@ -75,24 +133,50 @@ class TransactionRepository {
         .stream(primaryKey: ['id'])
         .eq('status', status.value)
         .order('created_at', ascending: false)
+        .limit(50) // Optimization: Limit to 50
         .map((data) =>
             data.map((json) => TransactionModel.fromJson(json)).toList());
   }
 
   /// Watch transactions by LIST of statuses
+  /// Uses a hybrid approach: fetch first, then subscribe to stream.
+  /// LIMITED to recent 50
   Stream<List<TransactionModel>> watchTransactionsByStatusList(
-      List<TransactionStatus> statuses) {
-    if (statuses.isEmpty) return const Stream.empty();
+      List<TransactionStatus> statuses) async* {
+    if (statuses.isEmpty) {
+      yield <TransactionModel>[];
+      return;
+    }
 
-    // Supabase stream filter for 'in' is .inFilter('column', [list])
-    // The library uses `in_` usually.
-    return _client
+    final statusValues = statuses.map((e) => e.value).toList();
+
+    // 1. Immediately fetch current data (fast, reliable)
+    try {
+      final initialData = await _client
+          .from('transactions')
+          .select()
+          .inFilter('status', statusValues)
+          .order('created_at', ascending: false)
+          .limit(50); // Optimization: Limit to 50
+      yield (initialData as List)
+          .map((json) => TransactionModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      yield <TransactionModel>[];
+    }
+
+    // 2. Then subscribe to realtime stream for updates
+    yield* _client
         .from('transactions')
         .stream(primaryKey: ['id'])
-        //.in_('status', statuses.map((e) => e.value).toList())
         .order('created_at', ascending: false)
-        .map((data) =>
-            data.map((json) => TransactionModel.fromJson(json)).toList());
+        .limit(50) // Optimization: Limit to 50
+        .map((data) {
+          return data
+              .where((json) => statusValues.contains(json['status']))
+              .map((json) => TransactionModel.fromJson(json))
+              .toList();
+        });
   }
 
   /// Claim a transaction (Admin only)

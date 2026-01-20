@@ -8,6 +8,7 @@ import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/screens/transaction_history_screen.dart';
 import '../../transactions/screens/buyer_transaction_status_screen.dart';
 import '../../transactions/services/forex_service.dart';
+import '../../chat/providers/chat_provider.dart';
 
 import '../../../core/widgets/animations/fade_in_slide.dart';
 import 'transaction_card_skeleton.dart';
@@ -17,7 +18,7 @@ class TransactionShortList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(userTransactionsProvider);
+    final transactionsAsync = ref.watch(recentUserTransactionsProvider);
 
     const currency = 'NGN'; // Hardcoded - country selection coming in v2.0
     final forexService = ref.read(forexServiceProvider);
@@ -107,7 +108,7 @@ class TransactionShortList extends ConsumerWidget {
   }
 }
 
-class _CompactTransactionCard extends StatelessWidget {
+class _CompactTransactionCard extends ConsumerWidget {
   final TransactionModel transaction;
   final String userCurrency;
   final ForexService forexService;
@@ -119,7 +120,11 @@ class _CompactTransactionCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch unread count for this transaction
+    final unreadAsync = ref.watch(unreadCountStreamProvider(transaction.id));
+    final unreadCount = unreadAsync.asData?.value ?? 0;
+
     // Determine if this is a Credit (Inflow) or Debit (Outflow) from Fiat Wallet perspective
     final isCredit = transaction.type == TransactionType.sellCrypto ||
         transaction.type == TransactionType.sellGiftCard ||
@@ -156,17 +161,49 @@ class _CompactTransactionCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              iconData,
-              color: iconColor,
-              size: 20,
-            ),
+          // Transaction icon with optional unread badge
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  iconData,
+                  color: iconColor,
+                  size: 20,
+                ),
+              ),
+              // Unread badge
+              if (unreadCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(

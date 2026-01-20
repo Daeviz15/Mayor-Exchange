@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../chat/providers/chat_provider.dart';
 
 /// Bottom Navigation Bar Widget
 /// Custom bottom navigation for Mayor Exchange
@@ -62,12 +64,21 @@ class AppBottomNavBar extends StatelessWidget {
                 isActive: currentIndex == 3,
                 onTap: () => onTap(3),
               ),
-              _NavItem(
-                icon: Icons.grid_view,
-                activeIcon: Icons.grid_view_rounded,
-                label: 'More',
-                isActive: currentIndex == 4,
-                onTap: () => onTap(4),
+              Consumer(
+                builder: (context, ref, child) {
+                  final globalUnreadAsync =
+                      ref.watch(globalUnreadCountProvider);
+                  final unreadCount = globalUnreadAsync.asData?.value ?? 0;
+
+                  return _NavItem(
+                    icon: Icons.grid_view,
+                    activeIcon: Icons.grid_view_rounded,
+                    label: 'More',
+                    isActive: currentIndex == 4,
+                    unreadCount: unreadCount,
+                    onTap: () => onTap(4),
+                  );
+                },
               ),
             ],
           ),
@@ -82,6 +93,7 @@ class _NavItem extends StatelessWidget {
   final IconData? activeIcon;
   final String label;
   final bool isActive;
+  final int unreadCount;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -89,6 +101,7 @@ class _NavItem extends StatelessWidget {
     this.activeIcon,
     required this.label,
     required this.isActive,
+    this.unreadCount = 0,
     required this.onTap,
   });
 
@@ -106,12 +119,42 @@ class _NavItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                isActive ? (activeIcon ?? icon) : icon,
-                color: isActive
-                    ? AppColors.navBarActive
-                    : AppColors.navBarInactive,
-                size: 24,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isActive ? (activeIcon ?? icon) : icon,
+                    color: isActive
+                        ? AppColors.navBarActive
+                        : AppColors.navBarInactive,
+                    size: 24,
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               Flexible(

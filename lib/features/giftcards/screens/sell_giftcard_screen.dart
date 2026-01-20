@@ -14,6 +14,8 @@ import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../transactions/services/forex_service.dart';
 import '../models/gift_card.dart';
+import '../models/gift_card_variant.dart';
+import '../../giftcards/providers/gift_cards_providers.dart';
 
 /// Screen for selling gift cards to the platform.
 /// Customers sell their gift cards in exchange for NGN or USDT.
@@ -37,9 +39,11 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
   final _picker = ImagePicker();
 
   bool _isLoading = false;
+  bool _isPhysicalCard = false; // false = E-Code, true = Physical
 
-  // Common denominations
-  final List<double> _commonDenominations = [25, 50, 100, 200, 500];
+  // Apple variant selection (only for Apple cards)
+  GiftCardVariant? _selectedVariant;
+  double? _selectedDenomination;
 
   @override
   void dispose() {
@@ -88,16 +92,65 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
     }
   }
 
-  /// Sell orders require: card value + proof image
-  bool get _isValidOrder {
-    return _cardValueUSD > 0 && _proofImage != null;
+  /// Sell orders require: valid card value + proof image
+  /// For Apple cards: also requires variant and denomination selection
+  bool _isOrderValid(GiftCard card) {
+    if (_cardValueUSD <= 0 || _proofImage == null) return false;
+
+    // Apple cards require variant + denomination selection
+    if (card.id == 'apple') {
+      if (_selectedVariant == null || _selectedDenomination == null)
+        return false;
+      final rate =
+          _selectedVariant!.getRateForDenomination(_selectedDenomination!);
+      return rate > 0;
+    }
+
+    // Other cards: validate against min/max/allowedDenominations
+    return card.isValidValue(_cardValueUSD);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Determine rate from gift card model
-    final buyRate = widget.giftCard.buyRate;
-    final isTradable = buyRate > 0;
+    // Watch for real-time updates to this card
+    final allCardsAsync = ref.watch(giftCardsFromDbProvider);
+    final GiftCard liveCard = allCardsAsync.when(
+      data: (cards) => cards.firstWhere(
+        (c) => c.id == widget.giftCard.id,
+        orElse: () => widget.giftCard,
+      ),
+      loading: () => widget.giftCard,
+      error: (_, __) => widget.giftCard,
+    );
+
+    // Check if this is Apple card (has variants)
+    final isAppleCard = liveCard.id == 'apple';
+
+    // Load Apple variants if applicable
+    final appleVariantsAsync = isAppleCard
+        ? ref.watch(appleVariantsProvider)
+        : const AsyncValue<List<GiftCardVariant>>.data([]);
+
+    // Determine rate based on card type
+    // For Apple: use variant-specific denomination rate
+    // For others: use physical/ecode rate
+    double buyRate;
+    if (isAppleCard &&
+        _selectedVariant != null &&
+        _selectedDenomination != null) {
+      buyRate =
+          _selectedVariant!.getRateForDenomination(_selectedDenomination!);
+    } else {
+      buyRate = liveCard.getRate(isPhysical: _isPhysicalCard);
+    }
+
+    // For Apple, tradable if isActive and we have variants loaded
+    // For others, tradable if isActive and buyRate > 0
+    final isTradable = liveCard.isActive &&
+        (isAppleCard
+            ? appleVariantsAsync.asData?.value.isNotEmpty ?? false
+            : buyRate > 0);
+    debugPrint('===================');
 
     // Get user's currency
 
@@ -107,6 +160,17 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
 
     double getRateInUserCurrency(double rateInNGN) {
       return forexService.convert(rateInNGN, userCurrency);
+    }
+
+    // Check if we are still loading critical data
+    final bool isStreamLoading = allCardsAsync.isLoading;
+    final bool isAppleLoading = isAppleCard && appleVariantsAsync.isLoading;
+
+    if (isStreamLoading || isAppleLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        body: Center(child: RocketLoader()),
+      );
     }
 
     return Scaffold(
@@ -123,14 +187,14 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: widget.giftCard.cardColor,
+                color: liveCard.cardColor,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Center(
-                child: widget.giftCard.icon != null
-                    ? Icon(widget.giftCard.icon, color: Colors.white, size: 18)
+                child: liveCard.icon != null
+                    ? Icon(liveCard.icon, color: Colors.white, size: 18)
                     : Text(
-                        widget.giftCard.logoText?.substring(0, 1) ?? '?',
+                        liveCard.logoText?.substring(0, 1) ?? '?',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -139,7 +203,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Text('Sell ${widget.giftCard.name}',
+            Text('Sell ${liveCard.name}',
                 style: AppTextStyles.titleLarge(context)),
           ],
         ),
@@ -155,14 +219,20 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                         color: AppColors.textSecondary, size: 48),
                     const SizedBox(height: 16),
                     Text(
-                      'This gift card is not available for trading yet.',
+                      !liveCard.isActive
+                          ? '${liveCard.name} is currently inactive.'
+                          : 'This gift card is not available for trading yet.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.bodyMedium(context)
                           .copyWith(color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Please check back later or contact support.',
+                      isAppleCard &&
+                              (appleVariantsAsync.asData?.value.isEmpty ??
+                                  false)
+                          ? 'No active variants found for this card.'
+                          : 'Please check back later or contact support.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.bodySmall(context)
                           .copyWith(color: AppColors.textTertiary),
@@ -176,107 +246,366 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Rate Display
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundCard,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.sell, color: AppColors.primaryOrange),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Admin Buy Rate',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Builder(builder: (context) {
-                                final rateInUserCurrency =
-                                    getRateInUserCurrency(buyRate);
-                                return Row(
-                                  children: [
-                                    CurrencyText(
-                                      symbol: currencySymbol,
-                                      amount:
-                                          '${rateInUserCurrency.toStringAsFixed(2)} per \$1',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primaryOrange,
-                                    ),
-                                  ],
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Denomination Selector
-                  Text('Card Value (USD)',
-                      style: AppTextStyles.labelMedium(context)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: _commonDenominations.map((denom) {
-                      final isSelected =
-                          _denominationController.text == denom.toString();
-                      return ChoiceChip(
-                        label: Text('\$$denom'),
-                        selected: isSelected,
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _denominationController.text = denom.toString();
-                            });
-                          }
-                        },
-                        selectedColor: AppColors.primaryOrange,
-                        backgroundColor: AppColors.backgroundElevated,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        side: BorderSide.none,
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _denominationController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Or enter custom value',
-                      hintStyle: TextStyle(color: AppColors.textTertiary),
-                      prefixText: '\$ ',
-                      prefixStyle:
-                          const TextStyle(color: Colors.white, fontSize: 18),
-                      filled: true,
-                      fillColor: AppColors.backgroundCard,
-                      border: OutlineInputBorder(
+                  // Rate Display - Only for non-Apple cards
+                  // Apple cards use variant-based pricing
+                  if (!isAppleCard) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundCard,
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.sell,
+                              color: AppColors.primaryOrange),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Admin Buy Rate',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Builder(builder: (context) {
+                                  final rateInUserCurrency =
+                                      getRateInUserCurrency(buyRate);
+                                  return Row(
+                                    children: [
+                                      CurrencyText(
+                                        symbol: currencySymbol,
+                                        amount:
+                                            '${rateInUserCurrency.toStringAsFixed(2)} per \$1',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.primaryOrange,
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ============================================
+                  // APPLE VARIANT SELECTOR (only for Apple cards)
+                  // ============================================
+                  if (isAppleCard) ...[
+                    Text('Select Card Type',
+                        style: AppTextStyles.labelMedium(context)),
+                    const SizedBox(height: 10),
+                    appleVariantsAsync.when(
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(
+                              color: AppColors.primaryOrange),
+                        ),
+                      ),
+                      error: (e, _) => Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('Error loading variants: $e',
+                            style: const TextStyle(color: Colors.red)),
+                      ),
+                      data: (variants) => Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: variants.map((variant) {
+                          final isSelected = _selectedVariant?.id == variant.id;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedVariant = variant;
+                                _selectedDenomination =
+                                    null; // Reset denomination
+                                _denominationController.clear();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primaryOrange
+                                    : AppColors.backgroundCard,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primaryOrange
+                                      : Colors.white10,
+                                ),
+                              ),
+                              child: Text(
+                                variant.name.replaceFirst('AppleCard ', ''),
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Denomination selector for selected variant
+                    if (_selectedVariant != null) ...[
+                      Text('Select Denomination',
+                          style: AppTextStyles.labelMedium(context)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _selectedVariant!.denominationRates
+                            .where((r) =>
+                                r.rate >
+                                0) // Only show denominations with rates set
+                            .map((rate) {
+                          final isSelected =
+                              _selectedDenomination == rate.denomination;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedDenomination = rate.denomination;
+                                _denominationController.text =
+                                    rate.denomination.toStringAsFixed(0);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primaryOrange
+                                    : AppColors.backgroundCard,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primaryOrange
+                                      : Colors.white10,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '\$${rate.denomination.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₦${rate.rate.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white70
+                                          : AppColors.textSecondary,
+                                      fontSize: 10,
+                                      fontFamily: 'Roboto',
+                                      fontFamilyFallback: const [
+                                        'Noto Sans',
+                                        'Arial'
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      // Show message if no rates are set
+                      if (_selectedVariant!.denominationRates
+                          .every((r) => r.rate <= 0))
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Rates not set for this variant. Please contact admin.',
+                            style: TextStyle(color: Colors.orange),
+                          ),
+                        ),
+                    ],
+
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ============================================
+                  // STANDARD CARD TYPE TOGGLE (for non-Apple cards)
+                  // ============================================
+                  if (!isAppleCard) ...[
+                    // Card Type Toggle (Physical vs E-Code)
+                    Text('Card Type',
+                        style: AppTextStyles.labelMedium(context)),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundCard,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _isPhysicalCard = false),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: !_isPhysicalCard
+                                      ? AppColors.primaryOrange
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.qr_code,
+                                      color: !_isPhysicalCard
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'E-Code',
+                                      style: TextStyle(
+                                        color: !_isPhysicalCard
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _isPhysicalCard = true),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: _isPhysicalCard
+                                      ? AppColors.primaryOrange
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.credit_card,
+                                      color: _isPhysicalCard
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Physical',
+                                      style: TextStyle(
+                                        color: _isPhysicalCard
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Denomination Selector (use dynamic denominations from card)
+                    Text('Card Value (USD)',
+                        style: AppTextStyles.labelMedium(context)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: liveCard.getValidDenominations().map((denom) {
+                        final isSelected = _denominationController.text ==
+                            denom.toInt().toString();
+                        return ChoiceChip(
+                          label: Text('\$${denom.toInt()}'),
+                          selected: isSelected,
+                          onSelected: (val) {
+                            if (val) {
+                              setState(() {
+                                _denominationController.text =
+                                    denom.toInt().toString();
+                              });
+                            }
+                          },
+                          selectedColor: AppColors.primaryOrange,
+                          backgroundColor: AppColors.backgroundElevated,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          side: BorderSide.none,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _denominationController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: liveCard.allowedDenominations.isEmpty
+                            ? 'Enter value (\$${liveCard.minValue.toInt()} - \$${liveCard.maxValue.toInt()})'
+                            : 'Select a denomination above',
+                        hintStyle: TextStyle(color: AppColors.textTertiary),
+                        prefixText: '\$ ',
+                        prefixStyle:
+                            const TextStyle(color: Colors.white, fontSize: 18),
+                        filled: true,
+                        fillColor: AppColors.backgroundCard,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ], // End of if (!isAppleCard)
 
                   const SizedBox(height: 24),
 
@@ -424,8 +753,8 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: (_isValidOrder && !_isLoading)
-                          ? () => _submitTransaction(buyRate)
+                      onPressed: (_isOrderValid(liveCard) && !_isLoading)
+                          ? () => _submitTransaction(liveCard, buyRate)
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,
@@ -453,7 +782,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
     );
   }
 
-  Future<void> _submitTransaction(double rate) async {
+  Future<void> _submitTransaction(GiftCard card, double rate) async {
     if (_cardValueUSD <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter a card value')));
@@ -491,14 +820,14 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: widget.giftCard.cardColor,
+                color: card.cardColor,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Center(
-                child: widget.giftCard.icon != null
-                    ? Icon(widget.giftCard.icon, color: Colors.white, size: 18)
+                child: card.icon != null
+                    ? Icon(card.icon, color: Colors.white, size: 18)
                     : Text(
-                        widget.giftCard.logoText?.substring(0, 1) ?? '?',
+                        card.logoText?.substring(0, 1) ?? '?',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -517,7 +846,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildConfirmRow('Gift Card:', widget.giftCard.name),
+            _buildConfirmRow('Gift Card:', card.name),
             _buildConfirmRow(
                 'Card Value:', '\$${_cardValueUSD.toStringAsFixed(0)}'),
             _buildConfirmRow(
@@ -597,11 +926,18 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
         type: TransactionType.sellGiftCard,
         amountFiat: fiatAmountNGN,
         amountCrypto: _cardValueUSD, // Store card value in crypto field
-        currencyPair: '${widget.giftCard.id}/NGN',
+        currencyPair: '${card.id}/NGN',
         proofImagePath: proofPath,
         details: {
-          'card_id': widget.giftCard.id,
-          'card_name': widget.giftCard.name,
+          'card_id': card.id,
+          'card_name': _selectedVariant != null
+              ? '${card.name} (${_selectedVariant!.name.replaceFirst("AppleCard ", "")})'
+              : card.name,
+          'card_type': _selectedVariant != null
+              ? 'variant'
+              : (_isPhysicalCard ? 'physical' : 'ecode'),
+          'variant_id': _selectedVariant?.id,
+          'variant_name': _selectedVariant?.name,
           'card_value_usd': _cardValueUSD,
           'rate_applied': rate,
           'card_code': _cardCodeController.text.isNotEmpty

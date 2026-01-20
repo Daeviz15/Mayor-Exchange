@@ -185,9 +185,8 @@ class _CryptoDetailsScreenState extends ConsumerState<CryptoDetailsScreen> {
                           cryptoSymbol: widget.cryptoSymbol,
                           selectedRange: selectedTimeRange,
                           onRangeChanged: (range) {
-                            ref
-                                .read(selectedTimeRangeProvider.notifier)
-                                .setRange(range);
+                            ref.read(selectedTimeRangeProvider.notifier).state =
+                                range;
                           },
                         ),
 

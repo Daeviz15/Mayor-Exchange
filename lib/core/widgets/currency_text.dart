@@ -59,6 +59,7 @@ class CurrencyText extends StatelessWidget {
             text: symbol,
             style: TextStyle(
               fontFamily: 'Roboto', // System font that includes Naira
+              fontFamilyFallback: const ['Noto Sans', 'Arial'],
               fontSize: effectiveFontSize,
               fontWeight: effectiveFontWeight,
               color: effectiveColor,
