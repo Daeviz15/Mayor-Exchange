@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/services/storage_service.dart';
 import '../../auth/providers/auth_providers.dart';
@@ -80,7 +81,9 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
   Future<void> _pickImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      setState(() => _imageFile = File(picked.path));
+      // Compress image before storing
+      final compressed = await ImageUtils.compressProofImage(File(picked.path));
+      setState(() => _imageFile = compressed);
     }
   }
 

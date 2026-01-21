@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/providers/supabase_provider.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../transactions/models/transaction.dart';
 import '../../transactions/providers/transaction_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -687,8 +688,9 @@ class _AdminTransactionDetailScreenState
 
     try {
       final client = ref.read(supabaseClientProvider);
-      final file = File(picked.path);
-      final fileExt = picked.path.split('.').last;
+      // Compress image before upload
+      final file = await ImageUtils.compressProofImage(File(picked.path));
+      final fileExt = 'jpg'; // Compressed files are always jpg
       final fileName =
           'admin_${transaction.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 

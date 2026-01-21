@@ -30,12 +30,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _isSigningOut = false;
-
   Future<void> _handleLogout(BuildContext context) async {
     final navigator = Navigator.of(context);
-    setState(() => _isSigningOut = true);
-    try {
+    try { 
       // Sign out and clear all data
       await ref.read(authControllerProvider.notifier).signOut();
       await ref.read(profileAvatarProvider.notifier).clear();

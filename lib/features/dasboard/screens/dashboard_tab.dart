@@ -599,11 +599,6 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
     );
   }
 
-  Color _getCardColor(int index) {
-    const colors = [Colors.orange, Colors.pink, Colors.blue, Colors.purple];
-    return colors[index % colors.length];
-  }
-
   void _showNotificationOverlay(
       BuildContext context, NotificationModel notification) {
     late OverlayEntry overlayEntry;

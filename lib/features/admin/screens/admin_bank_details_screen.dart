@@ -27,17 +27,6 @@ class _AdminBankDetailsScreenState
     // We can't use ref.watch directly in initState, but the StreamProvider will update the UI
   }
 
-  // Effect to sync controller with provider data
-  void _syncControllers(AppSettings settings) {
-    if (_bankNameController.text.isEmpty &&
-        settings.bankDetails['bank_name'] != null) {
-      _bankNameController.text = settings.bankDetails['bank_name'];
-      _accountNumberController.text =
-          settings.bankDetails['account_number'] ?? '';
-      _accountNameController.text = settings.bankDetails['account_name'] ?? '';
-    }
-  }
-
   Future<void> _saveSettings() async {
     setState(() => _isLoading = true);
     try {

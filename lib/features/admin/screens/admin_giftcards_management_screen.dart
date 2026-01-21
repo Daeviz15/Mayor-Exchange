@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../../giftcards/providers/gift_cards_providers.dart';
@@ -256,8 +257,11 @@ class _AdminGiftCardsManagementScreenState
                     final picked =
                         await picker.pickImage(source: ImageSource.gallery);
                     if (picked != null) {
+                      // Compress image before storing
+                      final compressed = await ImageUtils.compressProofImage(
+                          File(picked.path));
                       setDialogState(() {
-                        selectedImage = File(picked.path);
+                        selectedImage = compressed;
                       });
                     }
                   },

@@ -105,7 +105,7 @@ class _TransactionHistoryScreenState
                       if (index == transactions.length) {
                         return const Center(
                           child: Padding(
-                            padding: EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(16.0),
                             child: SizedBox(
                                 width: 24,
                                 height: 24,

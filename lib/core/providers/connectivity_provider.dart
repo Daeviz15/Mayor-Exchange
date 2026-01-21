@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
 
 enum NetworkStatus { online, offline }
 
@@ -12,8 +11,6 @@ final connectivityProvider =
 class ConnectivityNotifier extends Notifier<NetworkStatus> {
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   final Connectivity _connectivity = Connectivity();
-  final InternetConnectionChecker _dataChecker =
-      InternetConnectionChecker.createInstance();
 
   @override
   NetworkStatus build() {

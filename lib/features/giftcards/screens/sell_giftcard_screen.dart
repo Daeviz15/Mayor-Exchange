@@ -6,6 +6,7 @@ import '../../../core/providers/supabase_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/error_handler_utils.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/rocket_loader.dart';
 import '../../../core/widgets/currency_text.dart';
@@ -63,8 +64,11 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
 
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
+      // Compress the image before storing
+      final compressed =
+          await ImageUtils.compressProofImage(File(pickedFile.path));
       setState(() {
-        _proofImage = File(pickedFile.path);
+        _proofImage = compressed;
       });
     }
   }

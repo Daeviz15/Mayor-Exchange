@@ -38,9 +38,8 @@ final allAdminsProvider = StreamProvider<List<UserRole>>((ref) {
         .where((row) => row['role'] == 'admin' || row['role'] == 'super_admin')
         .toList();
 
-    final roles = <UserRole>[];
-
-    for (final row in adminRows) {
+    // OPTIMIZATION: Fetch all user info in PARALLEL instead of sequentially (N+1 fix)
+    final futures = adminRows.map((row) async {
       final userId = row['id'] as String;
       final role = row['role'] as String;
       final createdAt = row['created_at'] != null
@@ -74,15 +73,18 @@ final allAdminsProvider = StreamProvider<List<UserRole>>((ref) {
       }
       finalName ??= 'Admin ${userId.substring(0, 6)}';
 
-      roles.add(UserRole(
+      return UserRole(
         id: userId,
         displayName: finalName,
         fullName: finalName,
         email: email,
         role: role,
         createdAt: createdAt,
-      ));
-    }
+      );
+    });
+
+    // Wait for all RPC calls to complete in parallel
+    final roles = await Future.wait(futures);
 
     // Sort: super_admins first, then by name
     roles.sort((a, b) {

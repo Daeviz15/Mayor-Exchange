@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mayor_exchange/core/services/storage_service.dart';
 import 'package:mayor_exchange/core/theme/app_colors.dart';
+import 'package:mayor_exchange/core/utils/image_utils.dart';
 import 'package:mayor_exchange/core/widgets/rocket_loader.dart';
 import '../../../../core/widgets/error_state_widget.dart';
 import 'package:mayor_exchange/features/transactions/models/transaction.dart';
@@ -59,8 +60,11 @@ class _BuyerTransactionStatusScreenState
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
+    // Compress image before uploading
+    final compressed = await ImageUtils.compressProofImage(File(picked.path));
+
     setState(() {
-      _proofImage = File(picked.path);
+      _proofImage = compressed;
       _isUploading = true;
       _isSuccess = false;
     });
@@ -69,7 +73,7 @@ class _BuyerTransactionStatusScreenState
       final user = ref.read(authControllerProvider).asData?.value;
       if (user == null) return;
 
-      // 1. Upload Image
+      // 1. Upload Image (already compressed)
       final path = await ref.read(storageServiceProvider).uploadFile(
             file: _proofImage!,
             bucket: 'transaction-proofs',
