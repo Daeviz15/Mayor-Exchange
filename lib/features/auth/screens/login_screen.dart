@@ -13,6 +13,7 @@ import 'package:mayor_exchange/features/auth/screens/biometric_login_screen.dart
 import 'package:mayor_exchange/features/dasboard/screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mayor_exchange/features/auth/screens/forgot_password_screen.dart';
+import 'package:mayor_exchange/features/auth/screens/login_2fa_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   /// When true, skips the automatic redirect to biometric login
@@ -104,10 +105,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (securitySettings.biometricEnabled &&
         lastUser != null &&
         Supabase.instance.client.auth.currentSession == null) {
-      // Ensure we have a stored password before trying biometric login
-      final password =
-          await ref.read(lastLoggedInUserProvider.notifier).getPassword();
-      if (password == null) return;
+      // Biometric login will now rely on secure session persistence
+      // If session is null, we can't use biometrics to "re-sign in" without a password
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -160,6 +159,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
       // Navigation is primarily handled by _authStateSubscription,
       // but we can also check immediate result or catch errors here.
+    } on TwoFactorRequiredException catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => Login2FAScreen(
+            userId: e.userId,
+            email: e.email,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       String errorMessage = 'Failed to sign in';
@@ -220,19 +229,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // Store user info for biometric login
     final user = ref.read(authControllerProvider).asData?.value;
     if (user != null) {
-      // Only store password if we have one and it matches the current user
-      // (This handles the case where user might be logging in via Google)
-      String? password;
-      if (_emailController.text.trim().toLowerCase() ==
-          user.email.toLowerCase()) {
-        password = _passwordController.text;
-      }
-
       await ref.read(lastLoggedInUserProvider.notifier).setUser(
             email: user.email,
             avatarUrl: user.avatarUrl,
             displayName: user.fullName,
-            password: password,
+            // Password no longer stored
           );
     }
 
@@ -246,30 +247,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _navigateToBiometricLogin() async {
     final lastUser = ref.read(lastLoggedInUserProvider);
     if (lastUser != null) {
-      // Check for password availability
-      final password =
-          await ref.read(lastLoggedInUserProvider.notifier).getPassword();
-
       if (!mounted) return;
-
-      if (password != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => BiometricLoginScreen(
-              email: lastUser.email,
-              avatarUrl: lastUser.avatarUrl,
-              displayName: lastUser.displayName,
-            ),
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BiometricLoginScreen(
+            email: lastUser.email,
+            avatarUrl: lastUser.avatarUrl,
+            displayName: lastUser.displayName,
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login with password to re-enable biometrics'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

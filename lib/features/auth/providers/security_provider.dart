@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math' as math;
 import 'auth_providers.dart';
+import '../../../core/providers/supabase_provider.dart';
+import '../../../core/utils/security_utils.dart';
 
 /// Security Settings State
 class SecuritySettings {
@@ -40,6 +45,9 @@ class SecuritySettingsNotifier extends Notifier<SecuritySettings> {
   static const String _twoFactorKey = 'two_factor_enabled';
   static const String _twoFactorSecretKey = 'two_factor_secret';
 
+  // Create secure storage instance
+  final _secureStorage = const FlutterSecureStorage();
+
   @override
   SecuritySettings build() {
     _loadSettings();
@@ -48,10 +56,12 @@ class SecuritySettingsNotifier extends Notifier<SecuritySettings> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final twoFactorSecret = await _secureStorage.read(key: _twoFactorSecretKey);
+
     state = SecuritySettings(
       biometricEnabled: prefs.getBool(_biometricKey) ?? false,
       twoFactorEnabled: prefs.getBool(_twoFactorKey) ?? false,
-      twoFactorSecret: prefs.getString(_twoFactorSecretKey),
+      twoFactorSecret: twoFactorSecret,
     );
   }
 
@@ -61,12 +71,85 @@ class SecuritySettingsNotifier extends Notifier<SecuritySettings> {
     state = state.copyWith(biometricEnabled: enabled);
   }
 
+  String _generateRecoveryCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid ambiguous chars
+    final rnd = math.Random();
+    return List.generate(10, (index) => chars[rnd.nextInt(chars.length)])
+        .join();
+  }
+
+  Future<List<String>> generateAndStoreRecoveryCodes() async {
+    final supabase = ref.read(supabaseClientProvider);
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final codes = List.generate(8, (_) => _generateRecoveryCode());
+
+    // In a real app, we'd hash these before storing.
+    // For this implementation, we'll store them as they are or with a simple placeholder hash logic
+    // since we want the user to be able to see them once.
+
+    final inserts = codes
+        .map((code) => {
+              'user_id': user.id,
+              'code_hash': SecurityUtils.hashString(code.toUpperCase()),
+              'created_at': DateTime.now().toIso8601String(),
+            })
+        .toList();
+
+    await supabase.from('user_2fa_recovery_codes').insert(inserts);
+
+    return codes;
+  }
+
   Future<void> setTwoFactorEnabled(bool enabled, {String? secret}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_twoFactorKey, enabled);
+
     if (secret != null) {
-      await prefs.setString(_twoFactorSecretKey, secret);
+      await _secureStorage.write(key: _twoFactorSecretKey, value: secret);
+    } else if (!enabled) {
+      // If disabling, also clear from secure storage
+      await _secureStorage.delete(key: _twoFactorSecretKey);
     }
+
+    // Update Supabase user metadata and private secrets table
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        // Sync metadata
+        await supabase.auth.updateUser(
+          UserAttributes(
+            data: {
+              'two_factor_enabled': enabled,
+            },
+          ),
+        );
+
+        // Sync to private table
+        if (enabled && secret != null) {
+          await supabase.from('user_2fa_secrets').upsert({
+            'user_id': user.id,
+            'secret': secret,
+            'enabled': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        } else if (!enabled) {
+          await supabase
+              .from('user_2fa_secrets')
+              .delete()
+              .eq('user_id', user.id);
+          await supabase
+              .from('user_2fa_recovery_codes')
+              .delete()
+              .eq('user_id', user.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to sync 2FA status to Supabase: $e');
+    }
+
     state = state.copyWith(
       twoFactorEnabled: enabled,
       twoFactorSecret: secret ?? state.twoFactorSecret,
@@ -76,7 +159,24 @@ class SecuritySettingsNotifier extends Notifier<SecuritySettings> {
   Future<void> disableTwoFactor() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_twoFactorKey);
-    await prefs.remove(_twoFactorSecretKey);
+    await _secureStorage.delete(key: _twoFactorSecretKey);
+
+    // Update Supabase user metadata if logged in
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      if (supabase.auth.currentUser != null) {
+        await supabase.auth.updateUser(
+          UserAttributes(
+            data: {
+              'two_factor_enabled': false,
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to sync 2FA status to Supabase: $e');
+    }
+
     state = state.copyWith(
       twoFactorEnabled: false,
       twoFactorSecret: null,
@@ -127,7 +227,7 @@ class LastLoggedInUserNotifier extends Notifier<LastLoggedInUser?> {
   static const String _emailKey = 'last_logged_in_email';
   static const String _avatarKey = 'last_logged_in_avatar';
   static const String _displayNameKey = 'last_logged_in_display_name';
-  static const String _passwordKey = 'last_logged_in_password';
+  // Removed _passwordKey for security - biometrics will now rely on secure session persistence
 
   // Create secure storage instance
   final _secureStorage = const FlutterSecureStorage();
@@ -165,10 +265,7 @@ class LastLoggedInUserNotifier extends Notifier<LastLoggedInUser?> {
       await prefs.setString(_displayNameKey, displayName);
     }
 
-    // Store password securely if provided
-    if (password != null) {
-      await _secureStorage.write(key: _passwordKey, value: password);
-    }
+    // Removed password storage for security
 
     state = LastLoggedInUser(
       email: email,
@@ -177,16 +274,14 @@ class LastLoggedInUserNotifier extends Notifier<LastLoggedInUser?> {
     );
   }
 
-  Future<String?> getPassword() async {
-    return await _secureStorage.read(key: _passwordKey);
-  }
+  // No longer storing passwords
 
   Future<void> clearUser() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_emailKey);
     await prefs.remove(_avatarKey);
     await prefs.remove(_displayNameKey);
-    await _secureStorage.delete(key: _passwordKey);
+    // Removed password deletion since it's no longer stored
     state = null;
   }
 }

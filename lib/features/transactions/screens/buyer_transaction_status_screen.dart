@@ -147,7 +147,10 @@ class _BuyerTransactionStatusScreenState
         backgroundColor: AppColors.backgroundDark,
         appBar: AppBar(
           backgroundColor: AppColors.backgroundCard,
-          title: const Text('Transaction Details'),
+          title: const Text(
+            'Transaction Details',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
           centerTitle: true,
           actions: [
             // Chat button with unread badge
@@ -263,7 +266,10 @@ class _BuyerTransactionStatusScreenState
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundCard,
-        title: const Text('Transaction Details'),
+        title: const Text(
+          'Transaction Details',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: allTransactions.when(

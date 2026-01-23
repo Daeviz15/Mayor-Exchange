@@ -330,6 +330,27 @@ class _BuySellGiftCardScreenState extends ConsumerState<BuySellGiftCardScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 14, color: AppColors.textTertiary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Note: Final prices may differ slightly with respect to the final card rate before crediting, as rates vary frequently.',
+                        style: AppTextStyles.bodySmall(context).copyWith(
+                          color: AppColors.textTertiary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
               Text('Card Image', style: AppTextStyles.labelMedium(context)),
               const SizedBox(height: 10),

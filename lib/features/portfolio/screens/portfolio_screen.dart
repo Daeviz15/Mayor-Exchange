@@ -60,7 +60,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         elevation: 0,
         title: const Text(
           'My Portfolio',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
       ),

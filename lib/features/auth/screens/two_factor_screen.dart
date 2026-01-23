@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../Widgets/buttonWidget.dart';
 import '../providers/security_provider.dart';
 import '../providers/auth_providers.dart';
+import 'verify_2fa_screen.dart';
 
 class TwoFactorScreen extends ConsumerStatefulWidget {
   const TwoFactorScreen({super.key});
@@ -26,51 +27,34 @@ class _TwoFactorScreenState extends ConsumerState<TwoFactorScreen> {
   }
 
   void _generateSecret() {
-    // Generate a random secret (in production, use a proper TOTP library)
+    // Generate a Base32 secret (required by Google Authenticator and others)
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     final random = Random();
-    final secret = List.generate(32, (_) => random.nextInt(16))
-        .map((e) => e.toRadixString(16))
-        .join()
-        .toUpperCase();
-    
+    final secret =
+        List.generate(16, (index) => chars[random.nextInt(chars.length)])
+            .join();
+
     final user = ref.read(authControllerProvider).value;
     final email = user?.email ?? 'user@example.com';
-    
+
     // TOTP URI format: otpauth://totp/Issuer:AccountName?secret=SECRET&issuer=Issuer
-    final qrData = 'otpauth://totp/Mayor%20Exchange:$email?secret=$secret&issuer=Mayor%20Exchange';
-    
+    final qrData =
+        'otpauth://totp/Mayor%20Exchange:$email?secret=$secret&issuer=Mayor%20Exchange';
+
     setState(() {
       _secret = secret;
       _qrCodeData = qrData;
     });
   }
 
-  Future<void> _enable2FA() async {
+  void _enable2FA() {
     if (_secret == null) return;
 
-    try {
-      await ref.read(securitySettingsProvider.notifier).setTwoFactorEnabled(
-            true,
-            secret: _secret!,
-          );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Two-Factor Authentication enabled successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to enable 2FA: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Verify2FAScreen(secret: _secret!),
+      ),
+    );
   }
 
   Future<void> _disable2FA() async {
@@ -232,4 +216,3 @@ class _TwoFactorScreenState extends ConsumerState<TwoFactorScreen> {
     );
   }
 }
-

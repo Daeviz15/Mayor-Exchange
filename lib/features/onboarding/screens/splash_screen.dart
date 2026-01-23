@@ -4,17 +4,19 @@ import 'package:mayor_exchange/features/onboarding/screens/onboarding_screen.dar
 import 'package:mayor_exchange/features/dasboard/screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mayor_exchange/features/auth/screens/login_2fa_screen.dart';
 import 'package:mayor_exchange/features/auth/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _logoController;
   late AnimationController _pulseController;
@@ -26,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // Logo entrance animation
+    // ... animations ...
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -48,7 +50,6 @@ class _SplashScreenState extends State<SplashScreen>
       curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
     ));
 
-    // Pulsing glow animation
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -72,7 +73,18 @@ class _SplashScreenState extends State<SplashScreen>
 
       Widget target;
       if (session != null) {
-        target = const HomeScreen();
+        // CHECK FOR 2FA
+        final user = session.user;
+        final is2FAEnabled = user.userMetadata?['two_factor_enabled'] == true;
+
+        if (is2FAEnabled) {
+          target = Login2FAScreen(
+            userId: user.id,
+            email: user.email ?? '',
+          );
+        } else {
+          target = const HomeScreen();
+        }
       } else {
         final prefs = await SharedPreferences.getInstance();
         final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;

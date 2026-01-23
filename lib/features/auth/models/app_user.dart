@@ -9,6 +9,7 @@ class AppUser {
   final String? country;
   final String? currency;
   final DateTime createdAt;
+  final bool twoFactorEnabled;
 
   AppUser({
     required this.id,
@@ -21,6 +22,7 @@ class AppUser {
     this.country,
     this.currency,
     required this.createdAt,
+    this.twoFactorEnabled = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,7 @@ class AppUser {
       country: json['country'] as String?,
       currency: json['currency'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+      twoFactorEnabled: metadata?['two_factor_enabled'] == true,
     );
   }
 
@@ -58,6 +61,7 @@ class AppUser {
       'country': country,
       'currency': currency,
       'created_at': createdAt.toIso8601String(),
+      'two_factor_enabled': twoFactorEnabled,
     };
   }
 
@@ -72,6 +76,7 @@ class AppUser {
     String? country,
     String? currency,
     DateTime? createdAt,
+    bool? twoFactorEnabled,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -84,6 +89,7 @@ class AppUser {
       country: country ?? this.country,
       currency: currency ?? this.currency,
       createdAt: createdAt ?? this.createdAt,
+      twoFactorEnabled: twoFactorEnabled ?? this.twoFactorEnabled,
     );
   }
 }

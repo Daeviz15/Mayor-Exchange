@@ -5,6 +5,12 @@ import 'package:mayor_exchange/features/auth/models/app_user.dart';
 import 'package:mayor_exchange/features/auth/repositories/auth_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class TwoFactorRequiredException implements Exception {
+  final String userId;
+  final String email;
+  TwoFactorRequiredException({required this.userId, required this.email});
+}
+
 /// Provides a single instance of [AuthRepository] wired to the shared Supabase client.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final client = ref.read(supabaseClientProvider);
@@ -77,8 +83,24 @@ class AuthController extends AsyncNotifier<AppUser?> {
     state = const AsyncLoading();
     try {
       final repo = ref.read(authRepositoryProvider);
-      final user = await repo.signIn(email: email, password: password);
-      state = AsyncData(user);
+      final appUser = await repo.signIn(email: email, password: password);
+
+      // Check if 2FA is enabled for this user
+      final supabase = ref.read(supabaseClientProvider);
+      final user = supabase.auth.currentUser;
+      final metadata = user?.userMetadata ?? {};
+      final is2FAEnabled = metadata['two_factor_enabled'] == true;
+
+      if (is2FAEnabled) {
+        // Sign out immediately - we'll require 2FA before allowing the session to stay
+        await repo.signOut();
+        throw TwoFactorRequiredException(
+          userId: appUser.id,
+          email: appUser.email,
+        );
+      }
+
+      state = AsyncData(appUser);
     } catch (e, stackTrace) {
       state = AsyncError(e, stackTrace);
       rethrow; // Re-throw so UI can handle it

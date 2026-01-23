@@ -128,8 +128,10 @@ class _AdminTransactionDetailScreenState
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundCard,
-        title: Text('Transaction Details',
-            style: AppTextStyles.titleLarge(context)),
+        title: const Text(
+          'Transaction Details',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),

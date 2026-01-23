@@ -47,7 +47,21 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
   double? _selectedDenomination;
 
   @override
+  void initState() {
+    super.initState();
+    // Add listener to automatically rebuild when card value changes
+    _denominationController.addListener(_onInputChanged);
+  }
+
+  void _onInputChanged() {
+    // Trigger rebuild whenever denomination changes
+    // This ensures the sell button enables/disables immediately
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    _denominationController.removeListener(_onInputChanged);
     _denominationController.dispose();
     _cardCodeController.dispose();
     super.dispose();
@@ -592,7 +606,7 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(color: Colors.white, fontSize: 18),
-                      onChanged: (_) => setState(() {}),
+                      // Listener handles setState automatically
                       decoration: InputDecoration(
                         hintText: liveCard.allowedDenominations.isEmpty
                             ? 'Enter value (\$${liveCard.minValue.toInt()} - \$${liveCard.maxValue.toInt()})'
@@ -709,6 +723,27 @@ class _SellGiftCardScreenState extends ConsumerState<SellGiftCardScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 14, color: AppColors.textTertiary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Note: Final prices may differ slightly with respect to the final card rate before crediting, as rates vary frequently.',
+                            style: AppTextStyles.bodySmall(context).copyWith(
+                              color: AppColors.textTertiary,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ),
                       ],

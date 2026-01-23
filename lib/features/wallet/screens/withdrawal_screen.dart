@@ -51,7 +51,28 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
   WithdrawalMethod _selectedMethod = WithdrawalMethod.bank;
 
   @override
+  void initState() {
+    super.initState();
+    // Add listeners to automatically rebuild when inputs change
+    // This ensures withdrawal buttons enable/disable immediately
+    _walletAddressController.addListener(_onInputChanged);
+    _usdtAmountController.addListener(_onInputChanged);
+    _amountController.addListener(_onInputChanged);
+  }
+
+  void _onInputChanged() {
+    // Trigger rebuild whenever any form input changes
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    // Remove listeners
+    _walletAddressController.removeListener(_onInputChanged);
+    _usdtAmountController.removeListener(_onInputChanged);
+    _amountController.removeListener(_onInputChanged);
+
+    // Dispose controllers
     _amountController.dispose();
     _bankNameController.dispose();
     _accountNumberController.dispose();

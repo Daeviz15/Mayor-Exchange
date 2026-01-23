@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/widgets/offline_overlay.dart';
 import 'core/providers/shared_preferences_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/storage/supabase_storage.dart';
 
 Future<void> main() async {
   // Ensure Flutter is initialized
@@ -17,10 +18,13 @@ Future<void> main() async {
   // Load environment variables
   await dotenv.load(fileName: '.env');
 
-  // Initialize Supabase
+  // Initialize Supabase with secure storage
   await Supabase.initialize(
     url: SupabaseConstants.supabaseUrl,
     anonKey: SupabaseConstants.supabaseAnonKey,
+    authOptions: FlutterAuthClientOptions(
+      localStorage: SupabaseSecureStorage(),
+    ),
     realtimeClientOptions: const RealtimeClientOptions(
       timeout: Duration(seconds: 30),
     ),

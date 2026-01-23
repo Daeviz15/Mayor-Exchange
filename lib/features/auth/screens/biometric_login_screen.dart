@@ -146,15 +146,9 @@ class _BiometricLoginScreenState extends ConsumerState<BiometricLoginScreen>
             (route) => false,
           );
         } else {
-          // No session - try to login with stored password
-          final password =
-              await ref.read(lastLoggedInUserProvider.notifier).getPassword();
-
-          if (password != null) {
-            await ref.read(authControllerProvider.notifier).signInWithEmail(
-                  email: widget.email,
-                  password: password,
-                );
+          if (session != null) {
+            // Session exists, refresh auth state
+            await ref.read(authControllerProvider.notifier).refresh();
 
             if (!mounted) return;
             Navigator.of(context).pushAndRemoveUntil(
@@ -162,11 +156,12 @@ class _BiometricLoginScreenState extends ConsumerState<BiometricLoginScreen>
               (route) => false,
             );
           } else {
+            // No session - we can't re-login without password for security
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
-                    'Credentials expired. Please login with your password.'),
+                content:
+                    Text('Session expired. Please login with your password.'),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 3),
               ),
